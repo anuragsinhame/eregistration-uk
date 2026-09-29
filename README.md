@@ -25,6 +25,11 @@ Chromium is bundled, so nothing else has to be installed. First launch:
 
 * **macOS**: the app is not notarised, so macOS blocks it once. Either System Settings → Privacy &
   Security → **Open Anyway**, or in Terminal: `xattr -dr com.apple.quarantine "UK e-Registration Search.app"`.
+  If needed, clear all extended attributes recursively:
+
+  ```bash
+  xattr -cr "UK e-Registration Search.app"
+  ```
 * **Windows**: run `UK-e-Registration-Search-windows-x64.exe`; SmartScreen → *More info* → *Run anyway*.
   Needs the WebView2 runtime (already present on Windows 10/11 with Edge).
 
