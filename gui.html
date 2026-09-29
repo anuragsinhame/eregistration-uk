@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UK e-Registration Search</title>
+<style>
+  :root {
+    --bg: #f3f4f6; --card: #ffffff; --text: #1f2328; --muted: #6b7280; --border: #e3e6ea;
+    --accent: #2563eb; --accent-text: #ffffff; --ok: #15803d; --warn: #b45309; --err: #b91c1c;
+    --code: #0f172a; --code-text: #d5dae2; --input: #ffffff; --hover: #eef3ff; --th: #f7f8fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171a; --card: #1e2126; --text: #e6e8eb; --muted: #9aa3ad; --border: #2d3239;
+      --accent: #4f8cff; --ok: #4ade80; --warn: #fbbf24; --err: #f87171;
+      --code: #0b0d10; --code-text: #c8ccd2; --input: #14161a; --hover: #243044; --th: #23272d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    border-bottom: 1px solid var(--border); background: var(--card); flex: none;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  .pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); }
+  .spacer { flex: 1; }
+  main {
+    flex: 1; display: grid; grid-template-columns: minmax(440px, 1.15fr) minmax(340px, 1fr);
+    gap: 14px; padding: 14px; min-height: 0;
+  }
+  .col { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; padding-right: 2px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; flex: none; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .card.grow { display: flex; flex-direction: column; flex: 1; min-height: 220px; }
+  .hidden { display: none !important; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .between { justify-content: space-between; }
+  .hint { color: var(--muted); font-size: 12.5px; }
+  .field { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; align-items: start; margin: 8px 0; }
+  .field > .caption { color: var(--muted); font-size: 13px; text-align: right; padding-top: 7px; overflow-wrap: anywhere; }
+  .field.compact > .caption { padding-top: 2px; }
+  .indent { margin-left: 160px; }
+  input[type=text], input[type=password], select, textarea {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px;
+    background: var(--input); color: var(--text); font: inherit;
+  }
+  select { cursor: pointer; }
+  textarea { min-height: 62px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    font: inherit; padding: 7px 14px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); cursor: pointer; white-space: nowrap;
+  }
+  button:hover { background: var(--hover); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .5; cursor: default; filter: none; }
+  button.small { padding: 3px 10px; font-size: 12px; }
+  .check { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; cursor: pointer; }
+  .check input { margin: 0; }
+  dialog.settings-dialog {
+    width: min(720px, calc(100vw - 24px)); max-width: none; max-height: calc(100vh - 24px); padding: 0;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text);
+    box-shadow: 0 18px 60px #0005;
+  }
+  dialog.settings-dialog::backdrop { background: #10182099; }
+  .settings-dialog form { display: flex; flex-direction: column; max-height: calc(100vh - 26px); }
+  .settings-head, .settings-foot { display: flex; gap: 12px; align-items: center; padding: 14px 18px; }
+  .settings-head { justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .settings-head h2 { font-size: 16px; margin: 0 0 3px; }
+  .settings-head p { color: var(--muted); font-size: 12.5px; margin: 0; }
+  .settings-body { overflow: auto; padding: 4px 18px; }
+  .provider-section { padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .provider-section:last-child { border-bottom: 0; }
+  .provider-section h3 { font-size: 13px; margin: 0 0 8px; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+  .settings-field { min-width: 0; }
+  .settings-field > label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+  .settings-field input { width: 100%; }
+  .key-state { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 20px; }
+  .key-state .hint { flex: 1; font-size: 11.5px; }
+  .key-state .check { font-size: 11.5px; }
+  .settings-foot { justify-content: flex-end; border-top: 1px solid var(--border); }
+  #captchaSettingsMessage { flex: 1; margin: 0; }
+  @media (max-width: 540px) {
+    dialog.settings-dialog { width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
+    .settings-dialog form { max-height: calc(100vh - 18px); }
+    .settings-grid { grid-template-columns: 1fr; }
+    .settings-head, .settings-foot { padding-left: 12px; padding-right: 12px; }
+    .settings-body { padding-left: 12px; padding-right: 12px; }
+  }
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  fieldset:disabled { opacity: .55; pointer-events: none; }
+  .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+  #captchaBox { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  #captchaImg { display: block; max-width: 100%; border: 1px solid var(--border); border-radius: 6px; background: #fff; padding: 4px; margin: 6px 0 10px; }
+  #captchaInput { max-width: 220px; letter-spacing: .12em; font-size: 16px; text-transform: uppercase; }
+
+  .msg { padding: 8px 10px; border-radius: 7px; margin: 6px 0; font-size: 13px; border: 1px solid var(--border); }
+  .msg.error { color: var(--err); border-color: color-mix(in srgb, var(--err) 45%, transparent); }
+
+  .tablewrap { max-height: 340px; overflow: auto; border: 1px solid var(--border); border-radius: 7px; margin-top: 6px; }
+  table.data { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  table.data th, table.data td { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: left; vertical-align: top; white-space: nowrap; }
+  table.data td { white-space: normal; min-width: 60px; }
+  table.data th { background: var(--th); position: sticky; top: 0; z-index: 1; }
+
+  #log {
+    margin: 0; flex: 1; min-height: 120px; overflow: auto; padding: 10px; border-radius: 7px;
+    font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--code); color: var(--code-text);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  #log .warn { color: #fbbf24; }
+  #log .err { color: #f87171; }
+  #log .time { opacity: .55; }
+  #previewImg { max-width: 100%; border: 1px solid var(--border); border-radius: 6px; display: none; }
+  #previewImg.show { display: block; }
+  #busyBar { height: 3px; background: linear-gradient(90deg, transparent, var(--accent), transparent); background-size: 40% 100%;
+    animation: slide 1.1s linear infinite; visibility: hidden; flex: none; }
+  #busyBar.on { visibility: visible; }
+  @keyframes slide { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+  #downloadList { margin-top: 8px; max-height: 140px; overflow: auto; }
+  .filelist div { font-size: 12.5px; padding: 2px 0; }
+
+  /* menu after login */
+  .menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .menu button { text-align: left; padding: 12px 14px; border-radius: 10px; display: flex; flex-direction: column; gap: 4px; white-space: normal; }
+  .menu button strong { font-size: 14px; }
+  .menu button span { color: var(--muted); font-size: 12.5px; }
+  .menu button:hover { border-color: var(--accent); }
+
+  /* custom report */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+  .tab { padding: 6px 12px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; cursor: pointer; color: var(--muted); background: transparent; }
+  .tab.on { color: var(--text); border-color: var(--border); background: var(--card); margin-bottom: -1px; font-weight: 600; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .chip { font-size: 12.5px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
+  .chip:hover { border-color: var(--accent); }
+  .chip.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  #reportProgress { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; display: flex; gap: 10px; align-items: center; }
+  #reportProgress .pct { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; font-size: 12.5px; color: var(--muted); margin: 6px 0; }
+  .kv b { color: var(--text); font-weight: 500; }
+  #reportResults .row > .hi-wrap { flex: 1; min-width: 220px; }
+  #repName { min-height: 48px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>UK e-Registration Search</h1>
+  <span id="status" class="pill">Not connected</span>
+  <span id="busyText" class="hint"></span>
+  <div class="spacer"></div>
+  <button id="btnCaptchaSettings" class="small" title="Configure captcha provider API keys and models">Captcha settings</button>
+  <button id="btnMenu" class="small" title="Back to the Buyer / Seller / Report menu" disabled>Menu</button>
+  <button id="btnPreview" class="small" title="Take a screenshot of the automated browser" disabled>Preview page</button>
+  <button id="btnRescan" class="small" title="Re-read the controls on the current page" disabled>Rescan</button>
+  <button id="btnLogout" class="small" title="Close the browser and return to the login form" disabled>Disconnect</button>
+</header>
+<dialog id="captchaSettingsDialog" class="settings-dialog" aria-labelledby="captchaSettingsTitle">
+  <form id="captchaSettingsForm">
+    <div class="settings-head">
+      <div>
+        <h2 id="captchaSettingsTitle">Captcha provider settings</h2>
+        <p>Credentials are stored locally in captcha_settings.json. The file is not encrypted; environment variables override saved values.</p>
+      </div>
+      <button type="button" id="btnCloseCaptchaSettings" class="small">Close</button>
+    </div>
+    <div class="settings-body">
+      <div id="captchaEnvNotice" class="msg hidden"></div>
+      <section class="provider-section">
+        <h3>Anthropic</h3>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label for="settingAnthropicKey">API key</label>
+            <input id="settingAnthropicKey" type="password" autocomplete="new-password" placeholder="Enter a key to replace the saved key" data-setting="anthropic_api_key" data-secret>
+            <div class="key-state"><span id="stateAnthropicKey" class="hint"></span><label class="check"><input type="checkbox" data-clear-key="anthropic_api_key"> Remove saved key</label></div>
+          </div>
+          <div class="settings-field"><label for="settingClaudeModel">Model</label><input id="settingClaudeModel" type="text" data-setting="captcha_claude_model"></div>
+        </div>
+      </section>
+      <section class="provider-section">
+        <h3>OpenAI</h3>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label for="settingOpenAIKey">API key</label>
+            <input id="settingOpenAIKey" type="password" autocomplete="new-password" placeholder="Enter a key to replace the saved key" data-setting="openai_api_key" data-secret>
+            <div class="key-state"><span id="stateOpenAIKey" class="hint"></span><label class="check"><input type="checkbox" data-clear-key="openai_api_key"> Remove saved key</label></div>
+          </div>
+          <div class="settings-field"><label for="settingOpenAIModel">Model</label><input id="settingOpenAIModel" type="text" data-setting="captcha_openai_model"></div>
+          <div class="settings-field"><label for="settingOpenAIBase">API base URL</label><input id="settingOpenAIBase" type="text" data-setting="openai_base_url"></div>
+        </div>
+      </section>
+      <section class="provider-section">
+        <h3>Google Gemini</h3>
+        <div class="settings-grid">
+          <div class="settings-field">
+            <label for="settingGeminiKey">API key</label>
+            <input id="settingGeminiKey" type="password" autocomplete="new-password" placeholder="Enter a key to replace the saved key" data-setting="gemini_api_key" data-secret>
+            <div class="key-state"><span id="stateGeminiKey" class="hint"></span><label class="check"><input type="checkbox" data-clear-key="gemini_api_key"> Remove saved key</label></div>
+          </div>
+          <div class="settings-field"><label for="settingGeminiModel">Model</label><input id="settingGeminiModel" type="text" data-setting="captcha_gemini_model"></div>
+        </div>
+      </section>
+      <section class="provider-section">
+        <h3>OpenAI-compatible service</h3>
+        <div class="settings-grid">
+          <div class="settings-field"><label for="settingCompatibleURL">API base URL</label><input id="settingCompatibleURL" type="text" placeholder="https://provider.example/v1" data-setting="captcha_llm_base_url"></div>
+          <div class="settings-field"><label for="settingCompatibleModel">Model</label><input id="settingCompatibleModel" type="text" data-setting="captcha_llm_model"></div>
+          <div class="settings-field">
+            <label for="settingCompatibleKey">API key (optional)</label>
+            <input id="settingCompatibleKey" type="password" autocomplete="new-password" placeholder="Enter a key to replace the saved key" data-setting="captcha_llm_api_key" data-secret>
+            <div class="key-state"><span id="stateCompatibleKey" class="hint"></span><label class="check"><input type="checkbox" data-clear-key="captcha_llm_api_key"> Remove saved key</label></div>
+          </div>
+        </div>
+      </section>
+      <section class="provider-section">
+        <h3>Local tools</h3>
+        <div class="settings-grid">
+          <div class="settings-field"><label for="settingOllamaURL">Ollama URL</label><input id="settingOllamaURL" type="text" data-setting="captcha_ollama_url"></div>
+          <div class="settings-field"><label for="settingOllamaModel">Ollama model</label><input id="settingOllamaModel" type="text" data-setting="captcha_ollama_model"></div>
+          <div class="settings-field"><label for="settingTesseract">Tesseract executable path (optional)</label><input id="settingTesseract" type="text" placeholder="Use PATH default" data-setting="tesseract_cmd"></div>
+        </div>
+      </section>
+    </div>
+    <div class="settings-foot">
+      <span id="captchaSettingsMessage" class="hint"></span>
+      <button type="button" id="btnCancelCaptchaSettings">Cancel</button>
+      <button type="submit" class="primary">Save settings</button>
+    </div>
+  </form>
+</dialog>
+<div id="busyBar"></div>
+
+<main>
+  <section class="col" id="leftCol">
+
+    <!-- The one captcha box: shown at login AND whenever a page action needs a captcha -->
+    <div id="captchaBox" class="card hidden">
+      <h2>Captcha required</h2>
+      <div id="captchaPrompt" class="hint"></div>
+      <img id="captchaImg" alt="captcha image">
+      <div class="row">
+        <input id="captchaInput" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Type the characters">
+        <button id="btnCaptchaOk" class="primary">Submit</button>
+        <button id="btnCaptchaSkip" title="Continue without filling the captcha">Skip</button>
+        <button id="btnCaptchaCancel" title="Abort the current action">Cancel</button>
+      </div>
+      <div class="hint" style="margin-top:8px">Enter submits · Esc cancels</div>
+    </div>
+
+    <div id="loginCard" class="card">
+      <h2>Sign in</h2>
+      <div class="field"><span class="caption">Username</span><input id="username" type="text" autocomplete="username" autocapitalize="off"></div>
+      <div class="field"><span class="caption">Password</span><input id="password" type="password" autocomplete="current-password"></div>
+      <div class="field compact"><span></span><div>
+        <label class="check"><input id="rememberCredentials" type="checkbox"> Remember username and password</label>
+        <div class="hint">Stored locally in settings.json; not encrypted.</div>
+      </div></div>
+      <div class="field"><span class="caption">Captcha</span>
+        <div>
+          <select id="optSolver"><option value="manual">Type it myself</option></select>
+          <div id="solverHint" class="hint" style="margin-top:4px"></div>
+        </div>
+      </div>
+      <div class="row indent" style="margin-top:4px">
+        <label class="check"><input id="optHeaded" type="checkbox"> Show browser window</label>
+        <label class="check"><input id="optPreview" type="checkbox" checked> Page preview</label>
+      </div>
+      <div class="buttons indent"><button id="btnLogin" class="primary">Log in</button></div>
+      <div id="loginHint" class="hint indent" style="margin-top:8px"></div>
+    </div>
+
+    <!-- After login: what do you want to do? -->
+    <div id="menuCard" class="card hidden">
+      <h2>What would you like to do?</h2>
+      <div class="menu">
+        <button id="menuBuyer"><strong>Search for Buyer</strong><span>The site's Buyer Wise page with all its options</span></button>
+        <button id="menuSeller"><strong>Search for Seller</strong><span>The site's Seller Wise page with all its options</span></button>
+        <button id="menuReport"><strong>Custom report</strong><span>District, SRO, a range of years and a name — collected year by year, filtered here, saved as Excel</span></button>
+      </div>
+    </div>
+
+    <div id="pageCard" class="card hidden">
+      <div class="row between" style="margin-bottom:6px">
+        <h2 id="pageTitle" style="margin:0" title="">Page</h2>
+        <select id="navSelect" style="width:auto;max-width:280px"><option value="">Go to…</option></select>
+      </div>
+      <div id="captchaNote" class="hint hidden" style="margin-bottom:6px">This page has a captcha — you'll be asked for it when you submit.</div>
+      <div id="messages"></div>
+      <fieldset id="fs"><form id="pageForm" onsubmit="return false" autocomplete="off"></form></fieldset>
+
+      <!-- custom report: form -->
+      <div id="reportForm" class="hidden">
+        <div id="reportFields"></div>
+        <div class="field"><span class="caption">To year</span><select id="repToYear"></select></div>
+        <div class="field"><span class="caption">Name</span><div><textarea id="repName" placeholder="Buyer / seller name as it appears in the records"></textarea></div></div>
+        <div class="field compact"><span class="caption">Search as</span>
+          <div class="row">
+            <label class="check"><input id="repRoleBuyer" type="checkbox" checked> Buyer</label>
+            <label class="check"><input id="repRoleSeller" type="checkbox"> Seller</label>
+          </div>
+        </div>
+        <div class="buttons indent"><button id="btnRunReport" class="primary">Run report</button></div>
+        <div class="hint indent" style="margin-top:6px">Each year is searched one after another (both pages if Buyer and Seller are ticked) and the rows are collected here. If the site asks for a captcha you'll be prompted in the captcha box.</div>
+        <div id="reportProgress" class="hidden">
+          <span id="repProgressText" style="flex:1"></span>
+          <span id="repProgressTotal" class="pct"></span>
+          <button id="btnStopReport" class="small">Stop</button>
+        </div>
+      </div>
+
+      <!-- custom report: results -->
+      <div id="reportResults" class="hidden">
+        <div class="row between" style="margin-top:8px">
+          <h2 style="margin:0">Report</h2>
+          <div class="row">
+            <button id="btnReportBack" class="small">New report</button>
+            <button id="btnSaveReport" class="small primary">Save as Excel…</button>
+            <button id="btnOpenReport" class="small hidden">Open file</button>
+          </div>
+        </div>
+        <div id="repSummary" class="kv"></div>
+        <div class="tabs" id="repTabs"></div>
+        <div class="row">
+          <input id="repFilter" type="text" placeholder="Filter rows — every word must match (e.g. a name, S/o, a village)" style="flex:1;min-width:220px">
+          <select id="repFilterCol" style="width:auto"><option value="-1">All columns</option></select>
+          <label class="check" title="Save only the rows that match the filter"><input id="repSaveFiltered" type="checkbox" checked> Save filtered rows only</label>
+        </div>
+        <div class="chips" id="repChips"></div>
+        <div id="repChipHint" class="hint" style="margin-bottom:4px"></div>
+        <div id="repCount" class="hint"></div>
+        <div id="repTable"></div>
+        <div id="repSaved" class="hint" style="margin-top:6px"></div>
+        <div class="row" style="margin-top:12px">
+          <button id="btnDownloadRows" class="small">Download documents for shown rows</button>
+          <span class="hint" id="repDocDir" style="flex:1;min-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <button id="btnRepChooseDir" class="small">Folder…</button>
+          <button id="btnRepOpenDir" class="small">Open folder</button>
+          <button id="btnStopDownload" class="small hidden">Stop</button>
+        </div>
+        <div id="repDocProgress" class="hint"></div>
+        <div id="repDocList" class="hint filelist" style="max-height:140px;overflow:auto"></div>
+      </div>
+
+      <div id="tables"></div>
+      <div id="downloadBar" class="hidden" style="margin-top:14px">
+        <h2>Downloads</h2>
+        <div class="row">
+          <input id="outDir" type="text" style="flex:1;min-width:220px" placeholder="Folder to save documents into">
+          <button id="btnChooseDir">Choose…</button>
+          <button id="btnDownload" class="primary">Download all documents</button>
+          <button id="btnOpenDir">Open folder</button>
+        </div>
+        <div id="downloadList" class="hint filelist"></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="col">
+    <div class="card" id="previewCard">
+      <div class="row between"><h2>Browser page</h2><span id="previewUrl" class="hint" style="font-size:11.5px;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+      <img id="previewImg" alt="">
+      <div id="previewHint" class="hint">A screenshot of the automated browser appears here after each step.</div>
+    </div>
+    <div class="card grow">
+      <div class="row between" style="margin-bottom:8px"><h2 style="margin:0">Log</h2><button id="btnClearLog" class="small">Clear</button></div>
+      <pre id="log"></pre>
+    </div>
+  </aside>
+</main>
+
+<script src="hindi_input.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const el = (tag, attrs = {}, ...children) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v === null || v === undefined || v === false) continue;
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const c of children) if (c !== null && c !== undefined) n.append(c);
+    return n;
+  };
+
+  const state = {
+    connected: false, busy: false, page: null, captchaPending: false,
+    mode: null,                                   // 'buyer' | 'seller' | 'report' | null (menu)
+    report: { toYear: '', roles: { buyer: true, seller: false }, running: false },
+    reportData: null,                             // { params, sheets: { buyer: {header, rows}, seller: {...} }, partial }
+    reportSheet: 'buyer', reportFilter: '', reportCol: -1, savedPath: null,
+  };
+
+  // ---------------------------------------------------------------- pywebview bridge
+  let resolveReady;
+  const apiReady = new Promise(r => { resolveReady = r; });
+  if (window.pywebview && window.pywebview.api) resolveReady();
+  else window.addEventListener('pywebviewready', () => resolveReady());
+
+  async function call(method, ...args) {
+    await apiReady;
+    try {
+      return await window.pywebview.api[method](...args);
+    } catch (e) {
+      log(`API error in ${method}: ${(e && e.message) || e}`, 'err');
+      throw e;
+    }
+  }
+
+  // ---------------------------------------------------------------- log
+  function log(message, level) {
+    const pre = $('log');
+    const line = el('div', { class: level || '' },
+      el('span', { class: 'time', text: new Date().toLocaleTimeString() + '  ' }),
+      document.createTextNode(String(message)));
+    pre.append(line);
+    while (pre.childElementCount > 800) pre.firstElementChild.remove();
+    pre.scrollTop = pre.scrollHeight;
+  }
+  $('btnClearLog').onclick = () => $('log').replaceChildren();
+
+  // ---------------------------------------------------------------- status / busy
+  function setStatus(text, cls) {
+    const s = $('status');
+    s.textContent = text;
+    s.className = 'pill ' + (cls || '');
+  }
+  function refreshButtons() {
+    const { busy, connected } = state;
+    $('busyBar').classList.toggle('on', busy);
+    $('fs').disabled = busy;
+    $('btnLogin').disabled = busy;
+    $('btnCaptchaSettings').disabled = busy;
+    $('btnDownload').disabled = busy;
+    $('btnChooseDir').disabled = busy;
+    $('navSelect').disabled = busy || !(state.page && state.page.links && state.page.links.length);
+    $('btnRescan').disabled = busy || !connected || state.mode === null;
+    $('btnPreview').disabled = busy || !connected;
+    $('btnMenu').disabled = busy || !connected || state.mode === null;
+    $('btnLogout').disabled = !connected && !busy;
+    for (const id of ['menuBuyer', 'menuSeller', 'menuReport']) $(id).disabled = busy;
+    $('btnRunReport').disabled = busy;
+    $('repToYear').disabled = busy; $('repName').disabled = busy;
+    $('repRoleBuyer').disabled = busy; $('repRoleSeller').disabled = busy;
+    for (const c of $('reportFields').querySelectorAll('select, input, textarea')) c.disabled = busy;
+    $('btnStopReport').disabled = !state.report.running;
+    $('btnSaveReport').disabled = busy || !state.reportData;
+    $('btnDownloadRows').disabled = busy || !state.reportData;
+    $('btnRepChooseDir').disabled = busy;
+    $('btnStopDownload').disabled = !state.report.running;
+  }
+  function setBusy(busy, what) {
+    state.busy = !!busy;
+    $('busyText').textContent = busy ? (what || 'Working…') : '';
+    refreshButtons();
+  }
+
+  // ---------------------------------------------------------------- captcha box
+  function showCaptcha(ev) {
+    state.captchaPending = true;
+    $('captchaImg').src = ev.image;
+    $('captchaPrompt').textContent = ev.prompt || 'Enter the characters shown in the image.';
+    $('btnCaptchaSkip').classList.toggle('hidden', ev.allow_skip === false);
+    $('captchaInput').value = '';
+    $('captchaBox').classList.remove('hidden');
+    $('captchaBox').scrollIntoView({ block: 'nearest' });
+    setTimeout(() => $('captchaInput').focus(), 40);
+    refreshButtons();
+  }
+  function hideCaptcha() {
+    state.captchaPending = false;
+    $('captchaBox').classList.add('hidden');
+    refreshButtons();
+  }
+  function submitCaptcha() {
+    const v = $('captchaInput').value.trim();
+    if (!v) { $('captchaInput').focus(); return; }
+    hideCaptcha();
+    call('submit_captcha', v);
+  }
+  $('btnCaptchaOk').onclick = submitCaptcha;
+  $('btnCaptchaSkip').onclick = () => { hideCaptcha(); call('skip_captcha'); };
+  $('btnCaptchaCancel').onclick = () => { hideCaptcha(); call('cancel_captcha'); };
+  $('captchaInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submitCaptcha(); }
+    else if (e.key === 'Escape') { hideCaptcha(); call('cancel_captcha'); }
+  });
+
+  // ---------------------------------------------------------------- login
+  // Captcha solver choice: "manual" shows the image in the captcha box; the others (captcha_solvers.py)
+  // read it automatically and fall back to the box if they fail or the site rejects them twice.
+  function renderSolvers(solvers, preferred) {
+    const sel = $('optSolver');
+    sel.replaceChildren();
+    for (const s of solvers) {
+      const label = s.available ? `${s.label}${s.model ? ` · ${s.model}` : ''}` : `${s.label} — ${s.reason}`;
+      sel.append(el('option', { value: s.id, text: label, disabled: !s.available }));
+    }
+    const ok = solvers.find(s => s.id === preferred && s.available);
+    sel.value = ok ? preferred : 'manual';
+    const updateHint = () => {
+      const s = solvers.find(x => x.id === sel.value);
+      $('solverHint').textContent = !s || s.id === 'manual'
+        ? 'The captcha image is shown here and you type it. Use Captcha settings or environment variables to enable automatic readers.'
+        : `Only the captcha image is sent to ${s.label}. If it misreads twice, you are asked to type it.`;
+    };
+    sel.onchange = updateHint;
+    updateHint();
+  }
+
+  function renderCaptchaSettings(config) {
+    for (const input of $('captchaSettingsForm').querySelectorAll('[data-setting]')) {
+      const key = input.dataset.setting;
+      input.value = input.dataset.secret ? '' : ((config.values || {})[key] || '');
+    }
+    const keyStates = {
+      anthropic_api_key: 'stateAnthropicKey', openai_api_key: 'stateOpenAIKey',
+      gemini_api_key: 'stateGeminiKey', captcha_llm_api_key: 'stateCompatibleKey',
+    };
+    for (const [key, id] of Object.entries(keyStates)) {
+      const active = !!((config.configured || {})[key]);
+      $(id).textContent = active ? 'A key is configured.' : 'No key configured.';
+    }
+    const overridden = (config.env_overrides || []).length > 0;
+    $('captchaEnvNotice').textContent = overridden
+      ? 'Environment variables are set for some providers and will override the saved values.' : '';
+    $('captchaEnvNotice').classList.toggle('hidden', !overridden);
+    for (const checkbox of $('captchaSettingsForm').querySelectorAll('[data-clear-key]')) checkbox.checked = false;
+  }
+
+  async function openCaptchaSettings() {
+    const config = await call('captcha_config');
+    if (!config || config.ok === false) {
+      $('captchaSettingsMessage').textContent = (config && config.error) || 'Could not load settings.';
+      return;
+    }
+    renderCaptchaSettings(config);
+    $('captchaSettingsMessage').textContent = '';
+    $('captchaSettingsDialog').showModal();
+  }
+
+  async function saveCaptchaSettings(event) {
+    event.preventDefault();
+    const form = $('captchaSettingsForm');
+    const values = {};
+    for (const input of form.querySelectorAll('[data-setting]')) values[input.dataset.setting] = input.value;
+    const clear = Array.from(form.querySelectorAll('[data-clear-key]:checked'), box => box.dataset.clearKey);
+    const preferredSolver = $('optSolver').value;
+    $('captchaSettingsMessage').textContent = 'Saving settings…';
+    try {
+      const result = await call('save_captcha_config', values, clear);
+      if (!result || result.ok === false) {
+        $('captchaSettingsMessage').textContent = (result && result.error) || 'Could not save settings.';
+        return;
+      }
+      renderCaptchaSettings(result);
+      renderSolvers(result.solvers || [], preferredSolver);
+      $('captchaSettingsMessage').textContent = 'Settings saved.';
+    } catch (e) {
+      $('captchaSettingsMessage').textContent = 'Could not save settings.';
+    }
+  }
+
+  async function doLogin() {
+    const u = $('username').value.trim(), p = $('password').value;
+    if (!u || !p) { log('Enter the username and password first.', 'warn'); ($('username').value ? $('password') : $('username')).focus(); return; }
+    await call('save_prefs', { remember_credentials: $('rememberCredentials').checked, username: u, password: p });
+    setBusy(true, 'Starting…');
+    const res = await call('login', u, p, $('optHeaded').checked, $('optSolver').value || 'manual', $('optPreview').checked)
+      .catch(() => ({ ok: false, error: 'Could not reach the Python side.' }));
+    if (res && res.ok === false) { log(res.error || 'Login could not start.', 'err'); setBusy(false); }
+  }
+  $('btnLogin').onclick = doLogin;
+  $('rememberCredentials').addEventListener('change', () => {
+    if (!$('rememberCredentials').checked) call('save_prefs', { remember_credentials: false });
+  });
+  for (const id of ['username', 'password']) $(id).addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  $('optPreview').addEventListener('change', () => call('set_options', { preview: $('optPreview').checked }));
+
+  function showMenu() {
+    state.mode = null; state.page = null;
+    if (window.HindiInput) HindiInput.closeAll();
+    $('pageCard').classList.add('hidden');
+    $('loginCard').classList.add('hidden');
+    $('menuCard').classList.remove('hidden');
+    refreshButtons();
+  }
+
+  function showLogin() {
+    state.connected = false; state.page = null; state.mode = null;
+    $('pageCard').classList.add('hidden');
+    $('menuCard').classList.add('hidden');
+    $('loginCard').classList.remove('hidden');
+    $('previewImg').classList.remove('show'); $('previewImg').removeAttribute('src');
+    $('previewHint').classList.remove('hidden'); $('previewUrl').textContent = '';
+    hideCaptcha();
+    setStatus('Not connected', '');
+    refreshButtons();
+    setTimeout(() => $('password').focus(), 40);
+  }
+
+  // ---------------------------------------------------------------- page rendering
+  function setPreview(image, url) {
+    if (!image) return;
+    $('previewImg').src = image;
+    $('previewImg').classList.add('show');
+    $('previewHint').classList.add('hidden');
+    if (url !== undefined) { $('previewUrl').textContent = url; $('previewUrl').title = url; }
+  }
+
+  function textValues() {
+    const values = {};
+    for (const inp of $('pageForm').querySelectorAll('[data-kind="text"], [data-kind="password"], [data-kind="textarea"]'))
+      values[inp.dataset.selector] = inp.value;
+    return values;
+  }
+  async function clickButton(b) {
+    if (window.HindiInput) await HindiInput.flush();     // let any pending Hindi swaps land first
+    call('click', b.selector, textValues());
+  }
+
+  // Hindi typing helper (hindi_input.js): on by default for name-like fields, toggle per field.
+  const HINDI_DEFAULT = /name|hindi|नाम|buyer|seller|party|executant|claimant|father|husband/i;
+  function attachHindi(input, c) {
+    if (!window.HindiInput) return;
+    HindiInput.attach(input, { key: c.selector, enabled: c.kind === 'textarea' || HINDI_DEFAULT.test(c.label || ''), keyboard: true });
+  }
+
+  function renderControl(c) {
+    const wrap = el('div', { class: 'field' }, el('span', { class: 'caption', text: c.label || '', title: c.selector }));
+    let input;
+    if (c.kind === 'select') {
+      input = el('select', { disabled: c.disabled });
+      for (const o of c.options || []) input.append(el('option', { value: o.value, text: o.label || o.value, selected: o.selected }));
+      input.addEventListener('change', () => {
+        const o = input.options[input.selectedIndex];
+        call('set_value', c.selector, { value: o.value, label: o.textContent, field: c.label }, 'select');
+      });
+    } else if (c.kind === 'textarea') {
+      input = el('textarea', { placeholder: c.placeholder || '', disabled: c.disabled });
+      input.value = c.value || '';
+      input.addEventListener('change', () => call('set_value', c.selector, input.value, 'text'));
+    } else if (c.kind === 'checkbox') {
+      wrap.classList.add('compact');
+      input = el('input', { type: 'checkbox', disabled: c.disabled });
+      input.checked = !!c.checked;
+      input.addEventListener('change', () => call('set_value', c.selector, input.checked, 'checkbox'));
+    } else if (c.kind === 'radio') {
+      wrap.classList.add('compact');
+      input = el('div', { class: 'row' });
+      (c.options || []).forEach((o, i) => {
+        const r = el('input', { type: 'radio', name: 'rg_' + (c.name || c.selector), value: o.value, disabled: c.disabled });
+        r.checked = !!o.checked;
+        r.addEventListener('change', () => call('set_value', o.selector, true, 'radio'));
+        input.append(el('label', { class: 'check' }, r, document.createTextNode(o.label || o.value || `option ${i + 1}`)));
+      });
+    } else {
+      input = el('input', { type: c.kind === 'password' ? 'password' : 'text', placeholder: c.placeholder || '', maxlength: c.maxlength, disabled: c.disabled });
+      input.value = c.value || '';
+      input.addEventListener('change', () => call('set_value', c.selector, input.value, 'text'));
+    }
+    input.dataset.selector = c.selector;
+    input.dataset.kind = c.kind;
+    wrap.append(input);
+    if (c.kind === 'text' || c.kind === 'textarea') attachHindi(input, c);   // needs the input to have a parent
+    return wrap;
+  }
+
+  function renderPage(pg) {
+    if (window.HindiInput) HindiInput.closeAll();
+    state.page = pg;
+    state.connected = true;
+    if (pg.mode) state.mode = pg.mode;
+    $('loginCard').classList.add('hidden');
+    $('menuCard').classList.add('hidden');
+    $('pageCard').classList.remove('hidden');
+    const fileName = (pg.url || '').split('?')[0].split('/').pop();
+    const modeTitle = { buyer: 'Search for Buyer', seller: 'Search for Seller', report: 'Custom report' }[state.mode];
+    $('pageTitle').textContent = modeTitle ? `${modeTitle} · ${pg.heading || pg.title || fileName || ''}`.replace(/ · $/, '') : (pg.heading || pg.title || fileName || 'Page');
+    $('pageTitle').title = pg.url || '';
+    $('captchaNote').classList.toggle('hidden', !pg.captcha);
+
+    const m = $('messages');
+    m.replaceChildren();
+    for (const msg of pg.messages || []) m.append(el('div', { class: 'msg ' + (msg.level || 'info'), text: msg.text }));
+
+    const isReport = state.mode === 'report';
+    $('navSelect').classList.toggle('hidden', isReport);
+    $('fs').classList.toggle('hidden', isReport);            // the generic form is not shown in report mode
+    $('reportForm').classList.toggle('hidden', !isReport || !!state.reportData);
+    $('reportResults').classList.toggle('hidden', !isReport || !state.reportData);
+    $('tables').classList.toggle('hidden', isReport);
+    $('downloadBar').classList.toggle('hidden', true);
+    if (isReport) {
+      $('pageForm').replaceChildren();
+      renderReportForm(pg);
+      if (pg.preview) setPreview(pg.preview, pg.url); else $('previewUrl').textContent = pg.url || '';
+      setStatus('Connected', 'ok');
+      refreshButtons();
+      return;
+    }
+
+    const form = $('pageForm');
+    form.replaceChildren();
+    const buttons = [];
+    for (const c of pg.controls || []) {
+      if (c.kind === 'button') buttons.push(c); else form.append(renderControl(c));
+    }
+    if (!(pg.controls || []).length) form.append(el('div', { class: 'hint', text: 'No input controls were found on this page.' }));
+    if (buttons.length) {
+      const bar = el('div', { class: 'buttons' });
+      for (const b of buttons) {
+        bar.append(el('button', {
+          type: 'button', text: b.label, title: b.selector, disabled: b.disabled,
+          class: /search|submit|login|show|view|find|get|go\b/i.test(b.label) ? 'primary' : '',
+          onclick: () => clickButton(b),
+        }));
+      }
+      form.append(bar);
+    }
+
+    const t = $('tables');
+    t.replaceChildren();
+    let downloads = 0;
+    for (const tb of pg.tables || []) {
+      downloads += tb.downloads || 0;
+      const table = el('table', { class: 'data' });
+      if (tb.header) {
+        const tr = el('tr');
+        for (const h of tb.header) tr.append(el('th', { text: h }));
+        table.append(el('thead', {}, tr));
+      }
+      const tbody = el('tbody');
+      for (const r of tb.rows || []) {
+        const tr = el('tr');
+        for (const cell of r) tr.append(el('td', { text: cell }));
+        tbody.append(tr);
+      }
+      table.append(tbody);
+      const shown = (tb.rows || []).length;
+      const info = `${tb.total_rows} row${tb.total_rows === 1 ? '' : 's'}` +
+        (shown < tb.total_rows ? ` (showing first ${shown})` : '') +
+        (tb.downloads ? ` · ${tb.downloads} download link${tb.downloads === 1 ? '' : 's'}` : '');
+      t.append(el('div', { class: 'hint', style: 'margin-top:12px', text: info }), el('div', { class: 'tablewrap' }, table));
+    }
+    $('downloadBar').classList.toggle('hidden', downloads === 0);
+    if (downloads) $('btnDownload').textContent = `Download all ${downloads} document${downloads === 1 ? '' : 's'}`;
+
+    const nav = $('navSelect');
+    nav.replaceChildren(el('option', { value: '', text: 'Go to…' }));
+    (pg.links || []).forEach((l, i) => nav.append(el('option', { value: String(i), text: l.hover ? `${l.hover} › ${l.text}` : l.text })));
+
+    if (pg.preview) setPreview(pg.preview, pg.url); else $('previewUrl').textContent = pg.url || '';
+    setStatus('Connected', 'ok');
+    refreshButtons();
+  }
+
+  $('navSelect').addEventListener('change', () => {
+    const i = $('navSelect').value;
+    if (i === '' || !state.page) return;
+    const l = state.page.links[+i];
+    $('navSelect').value = '';
+    if (l) call('navigate', l.text, l.hover || null);
+  });
+
+  // ---------------------------------------------------------------- menu
+  $('menuBuyer').onclick = () => call('open_mode', 'buyer');
+  $('menuSeller').onclick = () => call('open_mode', 'seller');
+  $('menuReport').onclick = () => { state.reportData = null; state.savedPath = null; call('open_mode', 'report'); };
+  $('btnMenu').onclick = () => call('menu');
+
+  // ---------------------------------------------------------------- custom report: form
+  // The District / SRO / Year dropdowns are the site's own controls (so SRO cascades from District);
+  // the other fields live only in the app.
+  const REPORT_LABELS = { district: /district/i, sro: /sub.?reg|s\.?r\.?o\b|registrar/i, year: /year/i };
+  function findControl(pg, kind, re) { return (pg.controls || []).find(c => c.kind === kind && re.test(c.label || '')); }
+
+  function renderReportForm(pg) {
+    const box = $('reportFields');
+    box.replaceChildren();
+    const district = findControl(pg, 'select', REPORT_LABELS.district);
+    const sro = findControl(pg, 'select', REPORT_LABELS.sro);
+    const year = findControl(pg, 'select', REPORT_LABELS.year);
+    if (!district || !sro || !year) {
+      box.append(el('div', { class: 'msg error', text: 'Could not find the District / Sub-Registrar / Year dropdowns on this page. Use "Search for Buyer" to see what the page offers, or press Rescan.' }));
+    }
+    for (const c of [district, sro]) if (c) box.append(renderControl(c));
+    if (year) {
+      const from = renderControl(year); from.querySelector('.caption').textContent = 'From year';
+      box.append(from);
+      const to = $('repToYear'); to.replaceChildren();
+      const years = (year.options || []).filter(o => /^\d{4}$/.test((o.label || '').trim()));
+      for (const o of years) to.append(el('option', { value: o.label.trim(), text: o.label.trim() }));
+      const fromVal = ((year.options || []).find(o => o.selected) || {}).label || '';
+      const wanted = state.report.toYear || fromVal;
+      if ([...to.options].some(o => o.value === wanted)) to.value = wanted;
+      else if (to.options.length) to.value = to.options[0].value;
+    }
+    $('repRoleBuyer').checked = state.report.roles.buyer;
+    $('repRoleSeller').checked = state.report.roles.seller;
+  }
+  $('repToYear').addEventListener('change', () => { state.report.toYear = $('repToYear').value; });
+  $('repRoleBuyer').addEventListener('change', () => { state.report.roles.buyer = $('repRoleBuyer').checked; });
+  $('repRoleSeller').addEventListener('change', () => { state.report.roles.seller = $('repRoleSeller').checked; });
+
+  function selectedLabel(pg, re) {
+    const c = findControl(pg, 'select', re);
+    const o = c && (c.options || []).find(x => x.selected);
+    return o ? (o.label || '').trim() : '';
+  }
+
+  async function runReport() {
+    const pg = state.page || {};
+    if (window.HindiInput) await HindiInput.flush();
+    const roles = ['buyer', 'seller'].filter(r => state.report.roles[r]);
+    const district = selectedLabel(pg, REPORT_LABELS.district), sro = selectedLabel(pg, REPORT_LABELS.sro);
+    const fromYear = selectedLabel(pg, REPORT_LABELS.year), toYear = $('repToYear').value;
+    const name = $('repName').value.trim();
+    if (!roles.length) { log('Tick Buyer, Seller or both.', 'warn'); return; }
+    if (!district || /select/i.test(district) || !sro || /select/i.test(sro)) { log('Pick a District and a Sub-Registrar Office first.', 'warn'); return; }
+    if (!/^\d{4}$/.test(fromYear) || !/^\d{4}$/.test(toYear)) { log('Pick From and To years.', 'warn'); return; }
+    if (!name) { log('Enter a name to search for.', 'warn'); return; }
+    state.report.running = true; state.reportData = null; state.savedPath = null;
+    $('reportProgress').classList.remove('hidden');
+    $('repProgressText').textContent = 'Starting…'; $('repProgressTotal').textContent = '';
+    refreshButtons();
+    const res = await call('run_report', { roles, district, sro, from_year: fromYear, to_year: toYear, name });
+    if (res && res.ok === false) { log(res.error || 'Could not start the report.', 'err'); state.report.running = false; $('reportProgress').classList.add('hidden'); refreshButtons(); }
+  }
+  $('btnRunReport').onclick = runReport;
+  $('btnStopReport').onclick = () => { call('cancel_report'); $('repProgressText').textContent = 'Stopping after the current step…'; };
+
+  function onReportProgress(ev) {
+    const where = [ev.role ? ev.role[0].toUpperCase() + ev.role.slice(1) : '', ev.year || ''].filter(Boolean).join(' · ');
+    const text = `${where}${where ? ' — ' : ''}${ev.message || ''}`;
+    if (state.reportData) {                                    // results are on screen: this is the document download
+      $('repDocProgress').textContent = text;
+      return;
+    }
+    $('reportProgress').classList.remove('hidden');
+    $('repProgressText').textContent = text;
+    $('repProgressTotal').textContent = `${ev.total || 0} row${ev.total === 1 ? '' : 's'} so far`;
+  }
+
+  // ---------------------------------------------------------------- custom report: results
+  const RELATION_CHIPS = ['S/o', 'D/o', 'W/o', 'H/o', 'C/o', 'पुत्र', 'पुत्री', 'पत्नी', 'पति', 'विधवा', 'श्री', 'श्रीमती'];
+
+  function onReportDone(ev) {
+    state.report.running = false;
+    state.reportData = ev;
+    state.reportSheet = ['buyer', 'seller'].find(r => ev.sheets && ev.sheets[r] && ev.sheets[r].rows.length) || Object.keys(ev.sheets || {})[0] || 'buyer';
+    state.savedPath = null;
+    $('reportProgress').classList.add('hidden');
+    $('reportForm').classList.add('hidden');
+    $('reportResults').classList.remove('hidden');
+    $('btnOpenReport').classList.add('hidden');
+    $('repSaved').textContent = ev.partial ? 'Stopped early — showing the rows collected so far.' : '';
+    const p = ev.params || {};
+    const kv = $('repSummary'); kv.replaceChildren();
+    const pages = (p.roles || []).map(r => r === 'buyer' ? 'Buyer (Buyer Wise page)' : 'Seller (Seller Wise page)').join(', ');
+    for (const [k, v] of [['District', p.district], ['SRO', p.sro], ['Years', `${p.from_year}–${p.to_year}`], ['Name', p.name], ['Searched as', pages]])
+      kv.append(el('span', { text: k }), el('b', { text: String(v || '') }));
+    const chips = $('repChips'); chips.replaceChildren();
+    for (const c of RELATION_CHIPS) chips.append(el('button', { type: 'button', class: 'chip', text: c, onclick: () => toggleChip(c) }));
+    renderReportTabs();
+    renderReportTable();
+    refreshButtons();
+  }
+
+  function renderReportTabs() {
+    const tabs = $('repTabs'); tabs.replaceChildren();
+    const sheets = (state.reportData && state.reportData.sheets) || {};
+    for (const r of ['buyer', 'seller']) {
+      if (!sheets[r]) continue;
+      tabs.append(el('button', { type: 'button', class: 'tab' + (state.reportSheet === r ? ' on' : ''),
+        text: `${r === 'buyer' ? 'Buyer' : 'Seller'} (${sheets[r].rows.length})`,
+        onclick: () => { state.reportSheet = r; renderReportTabs(); renderReportTable(); } }));
+    }
+  }
+
+  // Filter semantics: relation/honorific chips (S/o, W/o, पुत्र, श्री...) must appear as a whole word in the
+  // searched party's column (Buyer/Second Party for the Buyer sheet, Seller/First Party for the Seller
+  // sheet); every other word is a substring match in "All columns" or the chosen column.
+  const CHIP_SET = new Set(RELATION_CHIPS.map(c => normToken(c)));
+  function normToken(t) { return String(t).toLowerCase().replace(/\/0/g, '/o').replace(/^[\s.,;:()\-]+|[\s.,;:()\-]+$/g, ''); }
+  function filterTerms() { return state.reportFilter.trim().split(/\s+/).filter(Boolean); }
+  function partyIndex(sheet, role) {
+    if (!sheet) return -1;
+    if (typeof sheet.party_index === 'number' && sheet.party_index >= 0) return sheet.party_index;
+    const re = role === 'seller' ? /seller|first\s*party|vendor/i : /buyer|second\s*party|purchaser/i;
+    return (sheet.header || []).findIndex(h => re.test(h) && !/gender|sex/i.test(h));
+  }
+  function rowMatches(row, terms, pIdx) {
+    if (!terms.length) return true;
+    const col = state.reportCol;
+    const hay = (col >= 0 ? String(row[col] || '') : row.join(' ␟ ')).toLowerCase();
+    const partyTokens = pIdx >= 0 ? new Set(String(row[pIdx] || '').split(/\s+/).map(normToken).filter(Boolean)) : null;
+    return terms.every(t => {
+      const tok = normToken(t);
+      if (CHIP_SET.has(tok)) return partyTokens ? partyTokens.has(tok) : hay.includes(tok);
+      return hay.includes(t.toLowerCase());
+    });
+  }
+  function visibleRows(role) {
+    const sheet = state.reportData && state.reportData.sheets[role];
+    if (!sheet) return [];
+    const terms = filterTerms();
+    const pIdx = partyIndex(sheet, role);
+    const out = [];
+    sheet.rows.forEach((r, i) => { if (rowMatches(r, terms, pIdx)) out.push(i); });
+    return out;
+  }
+
+  function renderReportTable() {
+    const sheet = state.reportData && state.reportData.sheets[state.reportSheet];
+    const box = $('repTable'); box.replaceChildren();
+    if (!sheet) return;
+    const colSel = $('repFilterCol');
+    const keepCol = state.reportCol;
+    colSel.replaceChildren(el('option', { value: '-1', text: 'All columns' }));
+    (sheet.header || []).forEach((h, i) => colSel.append(el('option', { value: String(i), text: h || `Column ${i + 1}` })));
+    colSel.value = [...colSel.options].some(o => o.value === String(keepCol)) ? String(keepCol) : '-1';
+    state.reportCol = Number(colSel.value);
+
+    const pIdx = partyIndex(sheet, state.reportSheet);
+    $('repChipHint').textContent = pIdx >= 0
+      ? `Chips match whole words in the “${sheet.header[pIdx]}” column (the party you searched for); other words match anywhere.`
+      : 'Chips match anywhere in the row (no party column recognised in this table).';
+
+    const idx = visibleRows(state.reportSheet);
+    const LIMIT = 500;
+    $('repCount').textContent = `${idx.length} of ${sheet.rows.length} row${sheet.rows.length === 1 ? '' : 's'}${filterTerms().length ? ' match the filter' : ''}${idx.length > LIMIT ? ` · showing the first ${LIMIT}` : ''}`;
+    if (!sheet.rows.length) { box.append(el('div', { class: 'hint', text: 'No rows were collected for this sheet.' })); return; }
+    const table = el('table', { class: 'data' });
+    if (sheet.header && sheet.header.length) {
+      const tr = el('tr'); for (const h of sheet.header) tr.append(el('th', { text: h })); table.append(el('thead', {}, tr));
+    }
+    const tbody = el('tbody');
+    for (const i of idx.slice(0, LIMIT)) { const tr = el('tr'); for (const cell of sheet.rows[i]) tr.append(el('td', { text: cell })); tbody.append(tr); }
+    table.append(tbody);
+    box.append(el('div', { class: 'tablewrap', style: 'max-height:420px' }, table));
+  }
+
+  function toggleChip(text) {
+    const terms = state.reportFilter.split(/\s+/).filter(Boolean);
+    const i = terms.findIndex(t => t.toLowerCase() === text.toLowerCase());
+    if (i >= 0) terms.splice(i, 1); else terms.push(text);
+    state.reportFilter = terms.join(' ');
+    $('repFilter').value = state.reportFilter;
+    syncChips(); renderReportTable();
+  }
+  function syncChips() {
+    const terms = new Set(state.reportFilter.toLowerCase().split(/\s+/).filter(Boolean));
+    for (const c of $('repChips').children) c.classList.toggle('on', terms.has(c.textContent.toLowerCase()));
+  }
+  $('repFilter').addEventListener('input', () => { state.reportFilter = $('repFilter').value; syncChips(); renderReportTable(); });
+  $('repFilterCol').addEventListener('change', () => { state.reportCol = Number($('repFilterCol').value); renderReportTable(); });
+  $('btnReportBack').onclick = () => { state.reportData = null; state.savedPath = null; $('reportResults').classList.add('hidden'); $('reportForm').classList.remove('hidden'); call('rescan'); };
+
+  function safeName(s) { return String(s || '').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_').slice(0, 40); }
+  $('btnSaveReport').onclick = async () => {
+    if (!state.reportData) return;
+    const p = state.reportData.params || {};
+    const onlyFiltered = $('repSaveFiltered').checked;
+    const selection = {};
+    for (const r of Object.keys(state.reportData.sheets)) selection[r] = onlyFiltered ? visibleRows(r) : null;
+    const name = `report_${safeName(p.district)}_${safeName(p.sro)}_${p.from_year}-${p.to_year}_${safeName(p.name)}.xlsx`;
+    $('repSaved').textContent = 'Saving…';
+    const res = await call('save_report', name, selection).catch(() => null);
+    if (!res || res.cancelled) { $('repSaved').textContent = ''; return; }
+    if (!res.ok) { $('repSaved').textContent = ''; log(res.error || 'Could not save the report.', 'err'); return; }
+    state.savedPath = res.path;
+    const counts = Object.entries(res.counts || {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+    $('repSaved').textContent = (res.format === 'csv'
+      ? `openpyxl is not installed, so CSV files were written instead (pip install openpyxl for Excel): ${(res.files || []).join(', ')}`
+      : `Saved ${res.path} (${counts})`);
+    $('btnOpenReport').classList.remove('hidden');
+    log(`Report saved: ${res.path}`);
+  };
+  $('btnOpenReport').onclick = () => { if (state.savedPath) call('open_path', state.savedPath); };
+
+  // ---------------------------------------------------------------- custom report: documents for the shown rows
+  function syncDocDir() { $('repDocDir').textContent = $('outDir').value; $('repDocDir').title = $('outDir').value; }
+  $('btnRepChooseDir').onclick = async () => {
+    const d = await call('choose_folder', $('outDir').value).catch(() => null);
+    if (d) { $('outDir').value = d; syncDocDir(); call('save_prefs', { download_dir: d }); }
+  };
+  $('btnRepOpenDir').onclick = () => call('open_folder', $('outDir').value);
+  $('btnDownloadRows').onclick = async () => {
+    if (!state.reportData || state.report.running) return;
+    const selection = {};
+    let n = 0;
+    for (const r of Object.keys(state.reportData.sheets)) { selection[r] = visibleRows(r); n += selection[r].length; }
+    if (!n) { log('No rows are shown - adjust the filter first.', 'warn'); return; }
+    const res = await call('download_rows', selection, $('outDir').value);
+    if (res && res.ok === false) { log(res.error || 'Could not start the downloads.', 'err'); return; }
+    state.report.running = true;                                // reuse the report's Stop machinery
+    $('repDocList').replaceChildren();
+    $('repDocProgress').textContent = `Downloading ${n} document${n === 1 ? '' : 's'}…`;
+    $('btnStopDownload').classList.remove('hidden');
+    refreshButtons();
+  };
+  $('btnStopDownload').onclick = () => { call('cancel_report'); $('repDocProgress').textContent = 'Stopping after the current file…'; };
+
+  function onDocDownloads(ev) {
+    const list = $('repDocList'); list.replaceChildren();
+    (ev.files || []).forEach(f => list.append(el('div', { text: '✓ ' + f.split(/[\\/]/).pop() })));
+    if (ev.done) {
+      state.report.running = false;
+      $('btnStopDownload').classList.add('hidden');
+      $('repDocProgress').textContent = `${(ev.files || []).length} of ${ev.total} document${ev.total === 1 ? '' : 's'} saved in ${ev.dir}`;
+      refreshButtons();
+    } else {
+      $('repDocProgress').textContent = `Downloading… ${(ev.files || []).length} of ${ev.total}`;
+    }
+  }
+
+  // ---------------------------------------------------------------- downloads
+  function renderDownloads(ev) {
+    const list = $('downloadList');
+    list.replaceChildren();
+    if (ev.dir) $('outDir').value = ev.dir;
+    if (!(ev.files || []).length && ev.done) { list.append(el('div', { text: 'No documents were downloaded.' })); return; }
+    (ev.files || []).forEach(f => list.append(el('div', { text: '✓ ' + f.split(/[\\/]/).pop() })));
+    if (ev.done) list.append(el('div', { text: `Done — ${ev.files.length} of ${ev.total} saved.` }));
+    else list.append(el('div', { text: `Downloading… ${ev.files.length} of ${ev.total}` }));
+  }
+  $('btnChooseDir').onclick = async () => {
+    const d = await call('choose_folder', $('outDir').value).catch(() => null);
+    if (d) { $('outDir').value = d; syncDocDir(); call('save_prefs', { download_dir: d }); }
+  };
+  $('btnDownload').onclick = () => call('download_all', $('outDir').value);
+  $('btnOpenDir').onclick = () => call('open_folder', $('outDir').value);
+
+  // ---------------------------------------------------------------- header buttons
+  $('btnPreview').onclick = () => call('preview');
+  $('btnRescan').onclick = () => call('rescan');
+  $('btnLogout').onclick = () => { if (state.captchaPending) { hideCaptcha(); call('cancel_captcha'); } call('logout'); };
+  $('btnCaptchaSettings').onclick = () => openCaptchaSettings().catch(() => {});
+  $('btnCloseCaptchaSettings').onclick = () => $('captchaSettingsDialog').close();
+  $('btnCancelCaptchaSettings').onclick = () => $('captchaSettingsDialog').close();
+  $('captchaSettingsForm').addEventListener('submit', saveCaptchaSettings);
+  $('captchaSettingsDialog').addEventListener('click', event => {
+    if (event.target === $('captchaSettingsDialog')) $('captchaSettingsDialog').close();
+  });
+
+  // ---------------------------------------------------------------- events from Python
+  window.app = {
+    onEvent(ev) {
+      if (!ev || typeof ev !== 'object') return;
+      switch (ev.type) {
+        case 'log': log(ev.message, ev.level === 'warn' ? 'warn' : ev.level === 'err' || ev.level === 'error' ? 'err' : ''); break;
+        case 'error': log(ev.message, 'err'); break;
+        case 'busy':
+          if (!ev.busy && state.report.running) { state.report.running = false; $('reportProgress').classList.add('hidden'); }
+          setBusy(ev.busy, ev.what); break;
+        case 'status':
+          state.connected = !!ev.connected;
+          setStatus(ev.text || (ev.connected ? 'Connected' : 'Not connected'), ev.connected ? 'ok' : (ev.text && /fail/i.test(ev.text) ? 'warn' : ''));
+          refreshButtons();
+          break;
+        case 'captcha': showCaptcha(ev); break;
+        case 'captcha_done': hideCaptcha(); break;
+        case 'page': renderPage(ev); break;
+        case 'preview': setPreview(ev.image); break;
+        case 'downloads': if (state.mode === 'report' && state.reportData) onDocDownloads(ev); else renderDownloads(ev); break;
+        case 'menu': showMenu(); break;
+        case 'report_progress': onReportProgress(ev); break;
+        case 'report_done': onReportDone(ev); break;
+        case 'reset': showLogin(); break;
+        default: log('Unknown event: ' + ev.type, 'warn');
+      }
+    },
+  };
+
+  // ---------------------------------------------------------------- init
+  if (window.HindiInput) {
+    let rulesNoted = false;
+    HindiInput.configure({
+      provider: async word => {
+        const r = await call('transliterate', word, 5);             // Python: hindi_input.suggest()
+        if (r && r.source === 'rules' && !rulesNoted) {
+          rulesNoted = true;
+          log('Hindi suggestions: Google Input Tools not reachable, using the built-in phonetic rules.', 'warn');
+        }
+        return (r && r.candidates) || [];
+      },
+      onError: msg => log(msg, 'warn'),
+    });
+    HindiInput.attach($('repName'), { key: 'repName', enabled: true, keyboard: true });
+    HindiInput.attach($('repFilter'), { key: 'repFilter', enabled: true, keyboard: true });
+  }
+  (async () => {
+    try {
+      const d = await call('defaults');
+      if (d) {
+        $('username').value = d.username || '';
+        $('password').value = d.password || '';
+        $('rememberCredentials').checked = !!d.remember_credentials;
+        $('outDir').value = d.download_dir || '';
+        syncDocDir();
+        renderSolvers(d.solvers || [], d.default_solver);
+        $('loginHint').textContent = d.login_url ? `Signs in at ${d.login_url}` : '';
+        // last-used values (settings.json)
+        const s = d.settings || {};
+        if (typeof s.headed === 'boolean') $('optHeaded').checked = s.headed;
+        if (typeof s.preview === 'boolean') { $('optPreview').checked = s.preview; call('set_options', { preview: s.preview }); }
+        const rep = s.report || {};
+        if (rep.to_year) state.report.toYear = String(rep.to_year);
+        if (Array.isArray(rep.roles) && rep.roles.length) state.report.roles = { buyer: rep.roles.includes('buyer'), seller: rep.roles.includes('seller') };
+        if (rep.name) $('repName').value = rep.name;
+        $('optHeaded').addEventListener('change', () => call('save_prefs', { headed: $('optHeaded').checked }));
+        $('optPreview').addEventListener('change', () => call('save_prefs', { preview: $('optPreview').checked }));
+        $('optSolver').addEventListener('change', () => call('save_prefs', { solver: $('optSolver').value }));
+      }
+    } catch (e) { /* logged already */ }
+    log('Ready. Enter your credentials and press Log in.');
+    ($('password').value ? $('btnLogin') : ($('username').value ? $('password') : $('username'))).focus();
+  })();
+})();
+</script>
+</body>
+</html>

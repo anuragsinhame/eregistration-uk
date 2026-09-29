@@ -1,0 +1,169 @@
+# Builds the desktop app for macOS and Windows.
+#
+#   push to main       -> tests, bumps VERSION, builds the DMG and EXE, and publishes latest/versioned releases.
+#   push to any other branch -> tests and no-browser build checks only; no artifacts or releases.
+#   manual             -> process check only.
+#
+# Chromium is bundled inside release builds, so downloaded apps need no Python or Playwright.
+name: Build desktop apps
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Tests (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install openpyxl
+      - run: python tests/run_all.py
+
+  version:
+    name: Bump project version
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Increment patch version
+        id: bump
+        shell: bash
+        run: |
+          current="$(tr -d '\r\n' < VERSION)"
+          if [[ ! "$current" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "VERSION must use MAJOR.MINOR.PATCH; got: $current" >&2
+            exit 1
+          fi
+          next="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$((BASH_REMATCH[3] + 1))"
+          printf '%s\n' "$next" > VERSION
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore: bump version to $next [skip ci]"
+          git push origin HEAD:main
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.label }}
+    needs: [test, version]
+    if: >-
+      ${{
+        always() &&
+        needs.test.result == 'success' &&
+        (needs.version.result == 'success' || needs.version.result == 'skipped')
+      }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS (Apple Silicon)
+            tag: macos-arm64
+          - os: windows-latest
+            label: Windows
+            tag: windows-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'refs/heads/main' || github.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-gui.txt
+
+      - name: Build release package or branch check
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            if [ "${{ matrix.os }}" = "macos-latest" ]; then
+              python build_app.py --dmg
+            else
+              python build_app.py --onefile
+            fi
+          else
+            python build_app.py --no-browser
+          fi
+
+      - name: List output
+        shell: bash
+        run: ls -la dist
+
+      - name: Upload release artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: UK-e-Registration-Search-${{ matrix.tag }}
+          path: |
+            dist/UK-e-Registration-Search-*.dmg
+            dist/UK-e-Registration-Search-*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish releases
+    needs: [build, version]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/heads/main
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Move the latest tag to this build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest
+          git push --force origin latest
+
+      - name: Rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build (v${{ needs.version.outputs.version }})
+          body: |
+            Automatic build of version **${{ needs.version.outputs.version }}** from `main`.
+
+            * **macOS** (Apple Silicon): download the `.dmg`, open it, and drag the app to Applications.
+              On first launch use System Settings → Privacy & Security → *Open Anyway*.
+            * **Windows**: download the `.exe` and run it (SmartScreen: *More info* → *Run anyway*).
+
+            Chromium is included; nothing else needs to be installed.
+          prerelease: false
+          make_latest: true
+          files: |
+            artifacts/*.dmg
+            artifacts/*.exe
+
+      - name: Versioned release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version.outputs.version }}
+          name: v${{ needs.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            artifacts/*.dmg
+            artifacts/*.exe

@@ -1,0 +1,22 @@
+{
+  "_comment": "Copy to captcha_settings.json and fill in what you use. Environment variables with the same (upper-case) names override these. Leave unused entries empty.",
+
+  "anthropic_api_key": "",
+  "captcha_claude_model": "claude-haiku-4-5-20251001",
+
+  "openai_api_key": "",
+  "openai_base_url": "https://api.openai.com/v1",
+  "captcha_openai_model": "gpt-4o-mini",
+
+  "gemini_api_key": "",
+  "captcha_gemini_model": "gemini-2.5-flash",
+
+  "captcha_llm_base_url": "",
+  "captcha_llm_api_key": "",
+  "captcha_llm_model": "",
+
+  "captcha_ollama_url": "http://localhost:11434",
+  "captcha_ollama_model": "llava",
+
+  "tesseract_cmd": ""
+}
