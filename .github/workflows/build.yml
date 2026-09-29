@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
       - run: pip install openpyxl
       - run: python tests/run_all.py
 
@@ -74,9 +74,10 @@ jobs:
           - os: macos-latest
             label: macOS (Apple Silicon)
             tag: macos-arm64
-          - os: windows-latest
-            label: Windows
-            tag: windows-x64
+          # Temporarily disabled; uncomment to restore Windows builds.
+          # - os: windows-latest
+          #   label: Windows
+          #   tag: windows-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
