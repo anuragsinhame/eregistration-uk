@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+downloads/
+settings.json
+captcha_settings.json
+tests/demo_harness*.html
+tests/_tmp_settings.json
+build/
+dist/
+*.spec
+.DS_Store

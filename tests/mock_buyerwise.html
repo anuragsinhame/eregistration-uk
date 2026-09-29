@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html><head><title>E-Search :: Buyer Wise</title>
+<style>
+ body{font-family:Arial;font-size:13px}
+ #menu ul{list-style:none;margin:0;padding:0} #menu li{display:inline-block;position:relative;padding:6px 12px;background:#2a5d84;color:#fff}
+ #menu li ul{display:none;position:absolute;left:0;top:100%;background:#2a5d84;width:180px} #menu li:hover ul{display:block}
+ #menu li li{display:block} #menu a{color:#fff;text-decoration:none}
+ .gv th{background:#ddd}
+</style></head>
+<body>
+<form method="post" action="./BuyerWise.aspx" id="form1">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwUKLTQ...">
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEdAA...">
+<table width="100%"><tr><td><img alt="logo" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="40" height="40"></td><td><span id="lblTitle" style="font-size:18px">Mock Registry Portal</span></td><td align="right">Welcome testuser | <a href="Logout.aspx">Logout</a></td></tr></table>
+<div id="menu"><ul>
+ <li><a href="Default2.aspx">Home</a></li>
+ <li><a href="#">Search By Party Name</a><ul><li><a href="BuyerWise.aspx">Buyer Wise</a></li><li><a href="SellerWise.aspx">Seller Wise</a></li></ul></li>
+ <li><a href="#">Search By Property</a><ul><li><a href="Khasra.aspx">Khasra No.</a></li></ul></li>
+ <li><a href="ChangePwd.aspx">Change Password</a></li>
+</ul></div>
+<h3>Search By Buyer Name</h3>
+<table id="tblSearch">
+ <tr><td>District <span style="color:red">*</span></td><td><select name="ctl00$MainContent$ddlDistrict" id="MainContent_ddlDistrict" onchange="javascript:setTimeout('__doPostBack(\'ctl00$MainContent$ddlDistrict\',\'\')', 0)"><option value="0">--Select--</option><option value="1">ALMORA</option><option selected value="2">BAGESHWAR</option><option value="3">DEHRADUN</option></select></td></tr>
+ <tr><td>Sub-Registrar Office</td><td><select name="ctl00$MainContent$ddlSRO" id="MainContent_ddlSRO"><option value="0">--Select--</option><option selected value="21">BAGESHWAR</option><option value="22">KAPKOT</option></select></td></tr>
+ <tr><td>Year</td><td><select name="ctl00$MainContent$ddlYear" id="MainContent_ddlYear"><option value="2025">2025</option><option value="2024">2024</option><option selected value="2023">2023</option></select></td></tr>
+ <tr><td>Search Type</td><td><table id="MainContent_rblType"><tr><td><input id="MainContent_rblType_0" type="radio" name="ctl00$MainContent$rblType" value="E" checked><label for="MainContent_rblType_0">Exact</label></td><td><input id="MainContent_rblType_1" type="radio" name="ctl00$MainContent$rblType" value="P"><label for="MainContent_rblType_1">Partial</label></td></tr></table></td></tr>
+ <tr><td>Buyer Name (Hindi)</td><td><textarea name="ctl00$MainContent$txtBuyer" rows="2" cols="30" id="MainContent_txtBuyer">आशुतोष जौहरी</textarea></td></tr>
+ <tr><td><input id="MainContent_chkExact" type="checkbox" name="ctl00$MainContent$chkExact"><label for="MainContent_chkExact">Include joint buyers</label></td><td></td></tr>
+ <tr><td>Enter Captcha</td><td><img id="MainContent_imgCaptcha" src="data:image/png;base64,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" width="140" height="44" alt="Captcha"> <input name="ctl00$MainContent$txtCaptcha" type="text" maxlength="6" id="MainContent_txtCaptcha"></td></tr>
+ <tr><td></td><td><input type="submit" name="ctl00$MainContent$btnSearch" value="Search" id="MainContent_btnSearch"> <input type="submit" name="ctl00$MainContent$btnReset" value="Reset" id="MainContent_btnReset"> <input type="submit" name="ctl00$MainContent$btnHidden" value="Hidden" id="MainContent_btnHidden" style="display:none"></td></tr>
+</table>
+<span id="MainContent_lblMsg" style="color:red">3 record(s) found.</span>
+<div>
+<table class="gv" cellspacing="0" rules="all" border="1" id="MainContent_gvResult" style="border-collapse:collapse">
+ <tr><th scope="col">Sr.No.</th><th scope="col">Reg. No.</th><th scope="col">Reg. Date</th><th scope="col">Buyer</th><th scope="col">Seller</th><th scope="col">Document</th></tr>
+ <tr><td>1</td><td>1234</td><td>12/03/2023</td><td>आशुतोष जौहरी</td><td>रमेश सिंह</td><td><a id="MainContent_gvResult_lnkDownload_0" href="javascript:__doPostBack('ctl00$MainContent$gvResult$ctl02$lnkDownload','')">Download Document</a></td></tr>
+ <tr><td>2</td><td>1301</td><td>20/04/2023</td><td>आशुतोष जौहरी</td><td>सीता देवी</td><td><a id="MainContent_gvResult_lnkDownload_1" href="javascript:__doPostBack('ctl00$MainContent$gvResult$ctl03$lnkDownload','')">Download Document</a></td></tr>
+ <tr><td>3</td><td>1420</td><td>02/06/2023</td><td>आशुतोष जौहरी</td><td>मोहन लाल</td><td><a id="MainContent_gvResult_lnkDownload_2" href="javascript:__doPostBack('ctl00$MainContent$gvResult$ctl04$lnkDownload','')">Download Document</a></td></tr>
+ <tr><td colspan="6"><table><tr><td><span>1</span></td><td><a href="javascript:__doPostBack('ctl00$MainContent$gvResult','Page$2')">2</a></td></tr></table></td></tr>
+</table>
+</div>
+<table width="100%"><tr><td>Copyright 2023</td><td>Disclaimer</td></tr></table>
+</form>
+</body></html>

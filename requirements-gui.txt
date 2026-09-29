@@ -1,0 +1,9 @@
+# GUI wrapper (uk_ereg_gui.py) - install into the same venv as uk_eregistration.py
+#   pip install -r requirements-gui.txt
+#   playwright install chromium
+pywebview>=5.0
+playwright>=1.40
+openpyxl>=3.1       # Excel export of the custom report (falls back to CSV without it)
+anthropic>=0.30     # only needed for the optional "Let Claude read captchas" checkbox
+pytesseract>=0.3.10 # Python wrapper for the optional Tesseract OCR solver
+Pillow>=10.0        # Image processing for the optional Tesseract OCR solver
