@@ -97,6 +97,11 @@ except ModuleNotFoundError as exc:  # e.g. `anthropic` missing in this environme
     )
 
 try:
+    import khasra_search
+except ModuleNotFoundError as exc:
+    sys.exit(f"Could not import khasra_search.py ({exc}). It must sit next to this file.")
+
+try:
     import hindi_input  # Roman -> Devanagari suggestions (hindi_input.py, reusable on its own)
 except ModuleNotFoundError:
     hindi_input = None
@@ -616,7 +621,7 @@ class Worker(threading.Thread):
         self.ctx = None
         self.page = None
         self._alive = True
-        self.mode: str | None = None          # "buyer" | "seller" | "report" | None (menu)
+        self.mode: str | None = None          # "buyer" | "seller" | "report" | "khasra" | None (menu)
         self.report: dict | None = None       # last custom report: {"params", "sheets": {role: {"header", "rows"}}, "partial"}
         self._cancel = threading.Event()      # set by the GUI's Stop button during a report
         self._nav_count = 0                   # main-frame navigations seen (used by _settle)
@@ -991,6 +996,8 @@ class Worker(threading.Thread):
         page = self._require_page()
         if role == "buyer":
             script.go_to_buyer_wise(page)                      # the CLI script's verified navigation
+        elif role == "khasra":
+            khasra_search.open_page(page, script.SEARCH_URL, self._goto, self._settle, self.log)
         else:
             item = ROLE_PAGES[role]
             self._goto(script.SEARCH_URL)
@@ -1012,11 +1019,11 @@ class Worker(threading.Thread):
         self._settle(0.2)
 
     def cmd_open_mode(self, mode: str) -> None:
-        if mode not in ("buyer", "seller", "report"):
+        if mode not in ("buyer", "seller", "report", "khasra"):
             raise ValueError(f"unknown mode {mode!r}")
         self._require_page()
         self.mode = mode
-        self._open_role_page("seller" if mode == "seller" else "buyer")
+        self._open_role_page("seller" if mode == "seller" else "khasra" if mode == "khasra" else "buyer")
         if mode == "report":
             self._apply_saved_report_prefs()
         self._push_page()
@@ -1285,7 +1292,7 @@ class Worker(threading.Thread):
         self._settle()
         return self._scan(RESULT_SCAN_ROWS)
 
-    def _collect_results(self, role: str, year: str) -> tuple[list[str], list[list[str]], list[dict]]:
+    def _collect_results(self, role: str, year: str, emit_progress: bool = True) -> tuple[list[str], list[list[str]], list[dict]]:
         """Walk every result page. Returns (header, rows, meta) where meta[i] records where row i
         came from ({"page": n, "cells": [...]}) so its document can be downloaded later."""
         scan = self._prepare_results()
@@ -1306,11 +1313,37 @@ class Worker(threading.Thread):
                 header = hdr
             rows_all.extend(rows)
             meta.extend({"page": page_no, "cells": r} for r in rows)
-            self._progress(role, year, f"page {page_no}: {len(rows_all)} row(s)")
+            if emit_progress:
+                self._progress(role, year, f"page {page_no}: {len(rows_all)} row(s)")
             scan = self._next_result_page(scan)
             if scan is None:
                 break
         return header, rows_all, meta
+
+    def cmd_run_khasra_search(self, params: dict) -> None:
+        self._cancel.clear()
+
+        def progress(year: str, number: str, completed: int, total: int, row_count: int) -> None:
+            self.ui.emit({"type": "khasra_progress", "year": year, "number": number,
+                          "completed": completed, "total": total, "rows": row_count})
+
+        def collect(role: str, year: str) -> tuple[list[str], list[list[str]], list[dict]]:
+            return self._collect_results(role, year, emit_progress=False)
+
+        try:
+            result = khasra_search.run_search(
+                self._require_page(), params,
+                scan=self._scan,
+                select_label=self._select_label,
+                click_search=lambda selector: self._click_with_captcha(selector, "Search"),
+                collect_results=collect,
+                cancelled=self._cancel.is_set,
+                progress=progress,
+                log=self.log,
+            )
+        except Aborted:
+            result = {"params": params, "header": [], "rows": [], "partial": True}
+        self.ui.emit({"type": "khasra_done", **result})
 
     def _search_role_year(self, role: str, ctl: dict, year: str, name: str) -> dict:
         """Select the year, fill the name, click Search (captcha if needed). Returns fresh controls."""
@@ -1669,6 +1702,19 @@ class Api:
         except (TypeError, ValueError):
             return {"ok": False, "error": "Pick From and To years."}
         self._worker.post("run_report", params=params or {}, _what="Running report...")
+        return {"ok": True}
+
+    def run_khasra_search(self, params: dict) -> dict:
+        params = params if isinstance(params, dict) else {}
+        if not khasra_search.parse_khasra_numbers(params.get("khasra_numbers", "")):
+            return {"ok": False, "error": "Enter at least one Khasra number."}
+        try:
+            int(params.get("from_year")), int(params.get("to_year"))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "Pick valid From and To years."}
+        if not params.get("district") or not params.get("sro"):
+            return {"ok": False, "error": "Pick a District and a Sub-Registrar Office first."}
+        self._worker.post("run_khasra_search", params=params, _what="Searching Khasra numbers...")
         return {"ok": True}
 
     def cancel_report(self) -> bool:

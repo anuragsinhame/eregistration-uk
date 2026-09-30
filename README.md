@@ -5,7 +5,7 @@ page; opening
 A small desktop app around the Uttarakhand Stamp & Registration **e-Search** portal
 (`online.eregistrationukgov.in/E_Search`). It logs in for you, shows every captcha inside the app
 (or reads it with an LLM of your choice), exposes the site's Buyer Wise / Seller Wise pages as
-native-looking forms, lets you type Hindi names in English, builds multi-year "custom reports"
+native-looking forms, searches lists of Khasra numbers across registration years, lets you type Hindi names in English, builds multi-year "custom reports"
 that you can filter and save as Excel, and downloads the documents behind the rows you keep.
 
 Everything runs locally: a headless Chromium (Playwright) does the browsing, Python drives it, and a
@@ -64,8 +64,8 @@ missing, the worker runs Playwright's installer, shows the download progress in 
 log, and then continues with the login. (The packaged app ships with Chromium and never needs this.)
 
 Then: check the credentials (prefilled from `uk_eregistration.py` / env vars), pick how captchas
-should be solved, press **Log in**, and choose **Search for Buyer**, **Search for Seller** or
-**Custom report**.
+should be solved, press **Log in**, and choose **Search for Buyer**, **Search for Seller**,
+**Search by Khasra number** or **Custom report**.
 
 Environment variables (all optional):
 
@@ -90,6 +90,7 @@ You can also open **Captcha settings** from the app header to save provider keys
 | `captcha_solvers.py` | Pluggable captcha readers (Claude, OpenAI, Gemini, any OpenAI-compatible API, Ollama, Tesseract). Also a CLI. | …adding a provider, changing models or the prompt. |
 | `captcha_settings.example.json` | Template for `captcha_settings.json` (keys and models). | Copy, rename, fill in. |
 | `report_export.py` | Writes the report to `.xlsx` (Buyer / Seller / Summary sheets) or CSV fallback. | …changing the Excel layout. |
+| `khasra_search.py` | Standalone Khasra Wise navigation, list parsing and year/number search workflow. | …changing Khasra search behavior. |
 | `uk_eregistration.py` | The original command-line script. The GUI imports its URLs, login selectors and `go_to_buyer_wise()`. Still runnable on its own. | …the site changes its login page ids or menu. |
 | `setup_env.py` | One-time setup on a new machine: `.venv`, requirements, Chromium, a `captcha_settings.json` from the example. | |
 | `build_app.py` | Packages the app with PyInstaller (bundles Chromium); used locally and by CI. See section 9. | …changing what goes into the app. |
@@ -135,7 +136,7 @@ Generated / private, safe to delete: `__pycache__/`, `settings.json` (last-used 
 
 Event types the page understands (see `onEvent` in `gui.html`): `log`, `error`, `busy`, `status`,
 `captcha`, `captcha_done`, `page`, `preview`, `downloads`, `menu`, `report_progress`,
-`report_done`, `reset`.
+`report_done`, `khasra_progress`, `khasra_done`, `reset`.
 
 ### 3.2 Login and captchas
 
@@ -183,6 +184,7 @@ After login the worker emits `menu`. `cmd_open_mode(mode)`:
 * `buyer` → `script.go_to_buyer_wise()` (the CLI script's tested navigation) → generic form.
 * `seller` → home page → hover "Search By Party Name" → click "Seller Wise" → generic form.
 * `report` → Buyer Wise page → the **report form** instead of the generic one.
+* `khasra` → `khasra_search.py` opens Khasra No. Wise and searches the supplied Khasra list over the selected year range.
 
 ### 3.5 Custom report (`cmd_run_report`)
 

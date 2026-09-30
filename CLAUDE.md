@@ -25,6 +25,7 @@ Read `README.md` for the full story; this file is the short version plus the rul
   Ollama / Tesseract). Standard library only; settings via the GUI's **Captcha settings** dialog,
   env vars, or `captcha_settings.json`.
 - `report_export.py` — Excel/CSV writer for the custom report. Standalone.
+- `khasra_search.py` — standalone Khasra No. Wise navigation, number-list parsing, and year-range search workflow; called by the Playwright worker.
 - `setup_env.py` — new-machine setup (venv + requirements + `playwright install chromium`). pip cannot
   run post-install steps, so browsers are never in requirements; the app also self-installs them.
 - `build_app.py` — PyInstaller packaging (bundles Chromium into the app). `.github/workflows/build.yml`
@@ -48,6 +49,7 @@ folder (project dir in development; Application Support / AppData when frozen). 
 | Waiting for postbacks | `_settle()` (load + networkidle + quiet period with no main-frame navigation), `_evaluate()` retries |
 | Modes after login | `cmd_open_mode` (`buyer` / `seller` / `report`), `cmd_menu` |
 | Custom report | `cmd_run_report` → `_report_controls` (label regexes `REPORT_LABELS`) → `_select_label` → `_click_with_captcha` → `_collect_results` (`PAGE_SIZE_JS`, `NEXT_PAGE_JS`). Row shape: `[ID, Year, *site cols, Relation, Relative]`; ID = `B2023-0001` (role letter, year, running no.); `party_column_index()` + `parse_relation()` fill the last two from the searched party's column (`PARTY_COLUMN`, `RELATION_RE`). Sheet carries `party_index` / `party_column`. |
+| Khasra search | `cmd_run_khasra_search` delegates to `khasra_search.py`; selects District/SRO and each available year, then searches the parsed Khasra list using the shared captcha and result-pagination helpers. |
 | Filter + Excel | gui.html `renderReportTable`/`visibleRows`/`rowMatches`: chip terms (`RELATION_CHIPS`) = whole-word match in the party column, other words = substring in the chosen scope; `Api.save_report` → `Worker.export_report` → `report_export.write_report` |
 | Documents for shown rows | `report["meta"]` (role/year/page/cells per row, filled by `_collect_results`) → `Api.download_rows` → `cmd_download_rows` (`_open_role_search`, `_search_role_year`, `_prepare_results`, `_next_result_page`, `ROW_LINK_JS`, `_download_marked`); file name = the row's ID |
 | Remembered settings | `load_settings`/`save_settings` (settings.json); `Api.defaults()` returns them; `Api.save_prefs`; `_apply_saved_report_prefs` in `cmd_open_mode("report")`; `cmd_run_report` saves the report fields |

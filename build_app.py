@@ -37,6 +37,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -44,7 +45,7 @@ HERE = Path(__file__).resolve().parent
 APP_NAME = "UK e-Registration Search"
 ENTRY = "uk_ereg_gui.py"
 DATA_FILES = ["gui.html", "hindi_input.js", "captcha_settings.example.json"]
-HIDDEN = ["uk_eregistration", "hindi_input", "captcha_solvers", "report_export", "openpyxl", "truststore",
+HIDDEN = ["uk_eregistration", "khasra_search", "hindi_input", "captcha_solvers", "report_export", "openpyxl", "truststore",
           "pytesseract", "PIL"]
 BROWSERS_BUILD_DIR = HERE / "build" / "ms-playwright"
 
@@ -63,7 +64,10 @@ def internal_dir(built: Path) -> Path:
 
 def copy_tree(src: Path, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
-    if dst.exists():
+    # PyInstaller can leave a dangling symlink at a data destination.
+    if dst.is_symlink():
+        dst.unlink()
+    elif dst.exists():
         shutil.rmtree(dst)
     if sys.platform == "darwin":
         run(["ditto", str(src), str(dst)])          # preserves symlinks, permissions and resource forks
@@ -71,11 +75,45 @@ def copy_tree(src: Path, dst: Path) -> None:
         shutil.copytree(src, dst, symlinks=True)
 
 
+def prepare_dmg_contents(app: Path, stage: Path) -> Path:
+    """Create the standard macOS DMG layout: app bundle plus an Applications shortcut."""
+    stage.mkdir(parents=True, exist_ok=True)
+
+    app_target = stage / app.name
+    if app_target.exists() or app_target.is_symlink():
+        if app_target.is_symlink() or app_target.is_file():
+            app_target.unlink()
+        else:
+            shutil.rmtree(app_target)
+    shutil.copytree(app, app_target, symlinks=True)
+
+    applications = stage / "Applications"
+    if applications.exists() or applications.is_symlink():
+        if applications.is_symlink() or applications.is_file():
+            applications.unlink()
+        else:
+            shutil.rmtree(applications)
+    try:
+        applications.symlink_to("/Applications")
+    except OSError:
+        # Fallback for filesystems that do not support symlinks.
+        applications.mkdir(parents=True, exist_ok=True)
+
+    return stage
+
+
 def make_dmg(app: Path, out: Path) -> None:
     if out.exists():
         out.unlink()
-    run(["hdiutil", "create", "-volname", APP_NAME, "-srcfolder", str(app),
-         "-ov", "-format", "UDZO", str(out)])
+
+    stage = Path(tempfile.mkdtemp(prefix="uk_ereg_dmg_", dir=str(HERE / "dist")))
+    try:
+        prepare_dmg_contents(app, stage)
+        run(["hdiutil", "create", "-volname", APP_NAME, "-srcfolder", str(stage),
+             "-ov", "-format", "UDZO", str(out)])
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage, ignore_errors=True)
     print("DMG:", out, f"({out.stat().st_size / 1e6:.0f} MB)")
 
 
@@ -140,14 +178,9 @@ def main() -> int:
         elif sys.platform == "darwin":
             # PyInstaller 6 keeps data files (the driver's .js) in Contents/Resources and symlinks them
             # from Contents/Frameworks. Node resolves the driver's real path, so the browsers must be
-            # real under Resources; Frameworks gets a symlink so sys._MEIPASS-based checks see them too.
+            # real under Resources; the existing package symlink makes them visible from Frameworks too.
             real = built / "Contents" / "Resources" / rel
             copy_tree(BROWSERS_BUILD_DIR, real)
-            link = internal / rel
-            link.parent.mkdir(parents=True, exist_ok=True)
-            if link.is_symlink() or link.exists():
-                (shutil.rmtree(link) if link.is_dir() and not link.is_symlink() else link.unlink())
-            link.symlink_to(os.path.relpath(real, link.parent))
             target = real
         else:
             target = internal / rel

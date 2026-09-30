@@ -72,10 +72,15 @@ class FakeLocator:
             if self.page.filled.get("#MainContent_txtCaptcha2", "") == CAPTCHA_ANSWER:
                 self.page.state = "results"; self.page.body = "Results\n"; self.page.result_page = 1
                 self.page.searches.append((self.page.role, self.page.year, self.page.filled.get("#MainContent_txtBuyer")))
+                if self.page.role == "khasra":
+                    self.page.khasra_searches.append((self.page.year, self.page.filled.get("#MainContent_txtKhasra")))
             else:
                 self.page.body = "Invalid Captcha, please try again\n"
         elif "Buyer Wise" in s or "Buyer" in s:
             self.page.url = BUYER_URL; self.page.state = "search"; self.page.role = "buyer"
+        elif "Khasra" in s:
+            self.page.url = "https://online.eregistrationukgov.in/E_Search/frm_index_khasra.aspx"
+            self.page.state = "search"; self.page.role = "khasra"
         elif "Seller" in s:
             self.page.url = SELLER_URL; self.page.state = "search"; self.page.role = "seller"
         elif "data-ereg-next" in s:
@@ -95,6 +100,7 @@ class FakePage:
         self.url = "about:blank"; self.filled = {}; self.clicks = []; self.postbacks = 0
         self.state = "login"; self.body = ""; self.pending_download = None; self.login_attempts = 0
         self.role = "buyer"; self.year = "2023"; self.result_page = 1; self.searches = []
+        self.khasra_searches = []
         self.marked = None; self.doc_clicks = []
         self.context = types.SimpleNamespace(pages=[self])
     def set_default_timeout(self, ms): pass
@@ -137,7 +143,7 @@ class FakePage:
         holder.value = FakeDownload(self.pending_download); self.pending_download = None
     def form_controls(self):
         who = "Buyer" if self.role == "buyer" else "Seller"
-        return [
+        controls = [
             {"kind": "select", "selector": "#MainContent_ddlDistrict", "label": "District", "value": "1",
              "options": [{"value": "0", "label": "--Select--", "selected": False}, {"value": "1", "label": "ALMORA", "selected": True}, {"value": "2", "label": "BAGESHWAR", "selected": False}]},
             {"kind": "select", "selector": "#MainContent_ddlSRO", "label": "Sub-Registrar Office", "value": "21",
@@ -148,6 +154,9 @@ class FakePage:
             {"kind": "text", "selector": "#tblSearch_filter", "label": "Search...", "value": ""},
             {"kind": "button", "selector": "#MainContent_btnSearch", "label": "Search"},
             {"kind": "button", "selector": "#MainContent_btnReset", "label": "Reset"}]
+        if self.role == "khasra":
+            controls[3] = {"kind": "text", "selector": "#MainContent_txtKhasra", "label": "Khasra No.", "value": ""}
+        return controls
     def scan(self):
         base = {"url": self.url, "title": "E-Search", "heading": "", "messages": [], "links": [
             {"text": "Buyer Wise", "hover": "Search By Party Name", "href": "#", "visible": False}], "tables": [], "controls": [], "captcha": None}
@@ -236,6 +245,23 @@ say("\n== 2. open Buyer mode -> page (generic form) ==")
 worker.post("open_mode", mode="buyer")
 pg = wait_for(lambda e: e["type"] == "page")
 assert pg["mode"] == "buyer" and FP.url == BUYER_URL and len(pg["controls"]) == 7
+idle()
+
+say("\n== 2b. Khasra mode searches a deduplicated list across selected years ==")
+worker.post("open_mode", mode="khasra")
+pg = wait_for(lambda e: e["type"] == "page")
+assert pg["mode"] == "khasra" and FP.role == "khasra" and pg["controls"][3]["label"] == "Khasra No."
+idle()
+FP.khasra_searches.clear()
+worker.post("run_khasra_search", params={"district": "BAGESHWAR", "sro": "BAGESHWAR", "from_year": "2022",
+                                         "to_year": "2023", "khasra_numbers": " 12, 13\n12 "})
+while True:
+    ev = wait_for(lambda e: e["type"] in ("captcha", "khasra_done"), timeout=15)
+    if ev["type"] == "captcha": worker.captcha_answers.put(CAPTCHA_ANSWER)
+    else: break
+assert ev["partial"] is False and ev["header"] == ["Khasra No.", "Year", "Sr", "Buyer", "Doc"]
+assert FP.khasra_searches == [("2022", "12"), ("2022", "13"), ("2023", "12"), ("2023", "13")], FP.khasra_searches
+assert len(ev["rows"]) == 12 and ev["params"]["khasra_numbers"] == ["12", "13"]
 idle()
 
 say("\n== 3. open Seller mode -> Seller Wise page ==")

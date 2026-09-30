@@ -286,6 +286,7 @@
       <div class="menu">
         <button id="menuBuyer"><strong>Search for Buyer</strong><span>The site's Buyer Wise page with all its options</span></button>
         <button id="menuSeller"><strong>Search for Seller</strong><span>The site's Seller Wise page with all its options</span></button>
+        <button id="menuKhasra"><strong>Search by Khasra number</strong><span>Search one or more Khasra numbers across registration years</span></button>
         <button id="menuReport"><strong>Custom report</strong><span>District, SRO, a range of years and a name — collected year by year, filtered here, saved as Excel</span></button>
       </div>
     </div>
@@ -352,6 +353,26 @@
         <div id="repDocList" class="hint filelist" style="max-height:140px;overflow:auto"></div>
       </div>
 
+      <div id="khasraForm" class="hidden">
+        <div id="khasraFields"></div>
+        <div class="field"><span class="caption">To year</span><select id="khasraToYear"></select></div>
+        <div class="field"><span class="caption">Khasra numbers</span><div><textarea id="khasraNumbers" placeholder="Enter one or more numbers, separated by commas or new lines"></textarea></div></div>
+        <div class="buttons indent"><button id="btnRunKhasra" class="primary">Search Khasra numbers</button></div>
+        <div id="khasraProgress" class="hidden" style="margin-top:8px">
+          <span id="khasraProgressText" style="flex:1"></span>
+          <span id="khasraProgressCount" class="pct"></span>
+          <button id="btnStopKhasra" class="small">Stop</button>
+        </div>
+      </div>
+      <div id="khasraResults" class="hidden">
+        <div class="row between" style="margin-top:8px">
+          <h2 style="margin:0">Khasra results</h2>
+          <button id="btnKhasraBack" class="small">New search</button>
+        </div>
+        <div id="khasraSummary" class="kv"></div>
+        <div id="khasraResultTable"></div>
+      </div>
+
       <div id="tables"></div>
       <div id="downloadBar" class="hidden" style="margin-top:14px">
         <h2>Downloads</h2>
@@ -399,8 +420,9 @@
 
   const state = {
     connected: false, busy: false, page: null, captchaPending: false,
-    mode: null,                                   // 'buyer' | 'seller' | 'report' | null (menu)
+    mode: null,                                   // 'buyer' | 'seller' | 'report' | 'khasra' | null (menu)
     report: { toYear: '', roles: { buyer: true, seller: false }, running: false },
+    khasra: { toYear: '', running: false, data: null },
     reportData: null,                             // { params, sheets: { buyer: {header, rows}, seller: {...} }, partial }
     reportSheet: 'buyer', reportFilter: '', reportCol: -1, savedPath: null,
   };
@@ -452,11 +474,16 @@
     $('btnPreview').disabled = busy || !connected;
     $('btnMenu').disabled = busy || !connected || state.mode === null;
     $('btnLogout').disabled = !connected && !busy;
-    for (const id of ['menuBuyer', 'menuSeller', 'menuReport']) $(id).disabled = busy;
+    for (const id of ['menuBuyer', 'menuSeller', 'menuKhasra', 'menuReport']) $(id).disabled = busy;
     $('btnRunReport').disabled = busy;
     $('repToYear').disabled = busy; $('repName').disabled = busy;
     $('repRoleBuyer').disabled = busy; $('repRoleSeller').disabled = busy;
     for (const c of $('reportFields').querySelectorAll('select, input, textarea')) c.disabled = busy;
+    $('btnRunKhasra').disabled = busy;
+    $('khasraToYear').disabled = busy;
+    $('khasraNumbers').disabled = busy;
+    for (const c of $('khasraFields').querySelectorAll('select, input, textarea')) c.disabled = busy;
+    $('btnStopKhasra').disabled = !state.khasra.running;
     $('btnStopReport').disabled = !state.report.running;
     $('btnSaveReport').disabled = busy || !state.reportData;
     $('btnDownloadRows').disabled = busy || !state.reportData;
@@ -689,7 +716,7 @@
     $('menuCard').classList.add('hidden');
     $('pageCard').classList.remove('hidden');
     const fileName = (pg.url || '').split('?')[0].split('/').pop();
-    const modeTitle = { buyer: 'Search for Buyer', seller: 'Search for Seller', report: 'Custom report' }[state.mode];
+    const modeTitle = { buyer: 'Search for Buyer', seller: 'Search for Seller', report: 'Custom report', khasra: 'Search by Khasra number' }[state.mode];
     $('pageTitle').textContent = modeTitle ? `${modeTitle} · ${pg.heading || pg.title || fileName || ''}`.replace(/ · $/, '') : (pg.heading || pg.title || fileName || 'Page');
     $('pageTitle').title = pg.url || '';
     $('captchaNote').classList.toggle('hidden', !pg.captcha);
@@ -699,15 +726,26 @@
     for (const msg of pg.messages || []) m.append(el('div', { class: 'msg ' + (msg.level || 'info'), text: msg.text }));
 
     const isReport = state.mode === 'report';
+    const isKhasra = state.mode === 'khasra';
     $('navSelect').classList.toggle('hidden', isReport);
-    $('fs').classList.toggle('hidden', isReport);            // the generic form is not shown in report mode
+    $('fs').classList.toggle('hidden', isReport || isKhasra);
     $('reportForm').classList.toggle('hidden', !isReport || !!state.reportData);
     $('reportResults').classList.toggle('hidden', !isReport || !state.reportData);
-    $('tables').classList.toggle('hidden', isReport);
+    $('khasraForm').classList.toggle('hidden', !isKhasra || !!state.khasra.data);
+    $('khasraResults').classList.toggle('hidden', !isKhasra || !state.khasra.data);
+    $('tables').classList.toggle('hidden', isReport || isKhasra);
     $('downloadBar').classList.toggle('hidden', true);
     if (isReport) {
       $('pageForm').replaceChildren();
       renderReportForm(pg);
+      if (pg.preview) setPreview(pg.preview, pg.url); else $('previewUrl').textContent = pg.url || '';
+      setStatus('Connected', 'ok');
+      refreshButtons();
+      return;
+    }
+    if (isKhasra) {
+      $('pageForm').replaceChildren();
+      renderKhasraForm(pg);
       if (pg.preview) setPreview(pg.preview, pg.url); else $('previewUrl').textContent = pg.url || '';
       setStatus('Connected', 'ok');
       refreshButtons();
@@ -780,6 +818,7 @@
   // ---------------------------------------------------------------- menu
   $('menuBuyer').onclick = () => call('open_mode', 'buyer');
   $('menuSeller').onclick = () => call('open_mode', 'seller');
+  $('menuKhasra').onclick = () => { state.khasra.data = null; state.khasra.toYear = ''; call('open_mode', 'khasra'); };
   $('menuReport').onclick = () => { state.reportData = null; state.savedPath = null; call('open_mode', 'report'); };
   $('btnMenu').onclick = () => call('menu');
 
@@ -812,6 +851,102 @@
     }
     $('repRoleBuyer').checked = state.report.roles.buyer;
     $('repRoleSeller').checked = state.report.roles.seller;
+  }
+
+  function renderKhasraForm(pg) {
+    const box = $('khasraFields');
+    box.replaceChildren();
+    const district = findControl(pg, 'select', /district/i);
+    const sro = findControl(pg, 'select', /sub.?reg|s\.?r\.?o\b|registrar/i);
+    const year = findControl(pg, 'select', /year/i);
+    if (!district || !sro || !year) {
+      box.append(el('div', { class: 'msg error', text: 'Could not find the District, Sub-Registrar Office, or Registration Year control on the Khasra page. Press Rescan to try again.' }));
+    }
+    for (const c of [district, sro]) if (c) box.append(renderControl(c));
+    if (year) {
+      const from = renderControl(year);
+      from.querySelector('.caption').textContent = 'From year';
+      box.append(from);
+      const to = $('khasraToYear'); to.replaceChildren();
+      const years = (year.options || []).filter(o => /^\d{4}$/.test((o.label || '').trim()));
+      for (const o of years) to.append(el('option', { value: o.label.trim(), text: o.label.trim() }));
+      const current = ((year.options || []).find(o => o.selected) || {}).label || '';
+      const wanted = state.khasra.toYear || current;
+      if ([...to.options].some(o => o.value === wanted)) to.value = wanted;
+      else if (to.options.length) to.value = to.options[0].value;
+    }
+    $('khasraNumbers').value = state.khasra.numbers || '';
+  }
+
+  $('khasraToYear').addEventListener('change', () => { state.khasra.toYear = $('khasraToYear').value; });
+
+  async function runKhasraSearch() {
+    const pg = state.page || {};
+    if (window.HindiInput) await HindiInput.flush();
+    const district = selectedLabel(pg, /district/i), sro = selectedLabel(pg, /sub.?reg|s\.?r\.?o\b|registrar/i);
+    const fromYear = selectedLabel(pg, /year/i), toYear = $('khasraToYear').value;
+    const numbers = $('khasraNumbers').value.trim();
+    if (!district || /select/i.test(district) || !sro || /select/i.test(sro)) { log('Pick a District and a Sub-Registrar Office first.', 'warn'); return; }
+    if (!/^\d{4}$/.test(fromYear) || !/^\d{4}$/.test(toYear)) { log('Pick From and To years.', 'warn'); return; }
+    if (!numbers) { log('Enter at least one Khasra number.', 'warn'); return; }
+    state.khasra.running = true;
+    state.khasra.data = null;
+    state.khasra.numbers = numbers;
+    $('khasraProgress').classList.remove('hidden');
+    $('khasraProgressText').textContent = 'Starting…';
+    $('khasraProgressCount').textContent = '';
+    refreshButtons();
+    const result = await call('run_khasra_search', {
+      district, sro, from_year: fromYear, to_year: toYear, khasra_numbers: numbers,
+    });
+    if (result && result.ok === false) {
+      log(result.error || 'Could not start the Khasra search.', 'err');
+      state.khasra.running = false;
+      $('khasraProgress').classList.add('hidden');
+      refreshButtons();
+    }
+  }
+  $('btnRunKhasra').onclick = runKhasraSearch;
+  $('btnStopKhasra').onclick = () => { call('cancel_report'); $('khasraProgressText').textContent = 'Stopping after the current search…'; };
+  $('btnKhasraBack').onclick = () => {
+    state.khasra.data = null;
+    $('khasraResults').classList.add('hidden');
+    $('khasraForm').classList.remove('hidden');
+  };
+
+  function onKhasraProgress(ev) {
+    $('khasraProgressText').textContent = `Khasra ${ev.number || ''}, ${ev.year || ''}`;
+    $('khasraProgressCount').textContent = `${ev.completed || 0} / ${ev.total || 0} searches · ${ev.rows || 0} rows`;
+  }
+
+  function onKhasraDone(ev) {
+    state.khasra.running = false;
+    state.khasra.data = ev;
+    $('khasraProgress').classList.add('hidden');
+    $('khasraForm').classList.add('hidden');
+    $('khasraResults').classList.remove('hidden');
+    const p = ev.params || {};
+    const summary = $('khasraSummary'); summary.replaceChildren();
+    for (const [key, value] of [['District', p.district], ['SRO', p.sro], ['Years', `${p.from_year}–${p.to_year}`],
+      ['Khasra numbers', (p.khasra_numbers || []).join(', ')], ['Rows', (ev.rows || []).length]]) {
+      summary.append(el('span', { text: key }), el('b', { text: String(value || '') }));
+    }
+    const root = $('khasraResultTable'); root.replaceChildren();
+    if (ev.partial) root.append(el('div', { class: 'msg warn', text: 'Search stopped early. Showing results collected so far.' }));
+    const table = el('table', { class: 'data' });
+    const head = el('tr');
+    for (const title of ev.header || []) head.append(el('th', { text: title }));
+    if (head.childElementCount) table.append(el('thead', {}, head));
+    const body = el('tbody');
+    for (const row of ev.rows || []) {
+      const tr = el('tr');
+      for (const cell of row) tr.append(el('td', { text: cell }));
+      body.append(tr);
+    }
+    table.append(body);
+    if ((ev.rows || []).length) root.append(el('div', { class: 'tablewrap' }, table));
+    else root.append(el('div', { class: 'hint', text: 'No matching records were found.' }));
+    refreshButtons();
   }
   $('repToYear').addEventListener('change', () => { state.report.toYear = $('repToYear').value; });
   $('repRoleBuyer').addEventListener('change', () => { state.report.roles.buyer = $('repRoleBuyer').checked; });
@@ -1067,6 +1202,7 @@
         case 'error': log(ev.message, 'err'); break;
         case 'busy':
           if (!ev.busy && state.report.running) { state.report.running = false; $('reportProgress').classList.add('hidden'); }
+          if (!ev.busy && state.khasra.running) { state.khasra.running = false; $('khasraProgress').classList.add('hidden'); }
           setBusy(ev.busy, ev.what); break;
         case 'status':
           state.connected = !!ev.connected;
@@ -1081,6 +1217,8 @@
         case 'menu': showMenu(); break;
         case 'report_progress': onReportProgress(ev); break;
         case 'report_done': onReportDone(ev); break;
+        case 'khasra_progress': onKhasraProgress(ev); break;
+        case 'khasra_done': onKhasraDone(ev); break;
         case 'reset': showLogin(); break;
         default: log('Unknown event: ' + ev.type, 'warn');
       }
